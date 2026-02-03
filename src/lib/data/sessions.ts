@@ -25,34 +25,6 @@ export const sessions: PracticeSession[] = [
     ]
   },
   {
-    slug: 'smart-contract',
-    title: 'Smart contract deployment flow',
-    summary: 'Review contract structure and build a pre-deployment checklist.',
-    difficulty: 'Foundations',
-    goals: [
-      'Understand the deployment stages',
-      'Identify how gas fees are calculated',
-      'Complete a deployment checklist'
-    ],
-    tasks: [
-      'Read the structure of a simple token contract',
-      'Outline preparation steps for each deployment stage',
-      'Check expected costs on a testnet'
-    ]
-  },
-  {
-    slug: 'defi-flow',
-    title: 'DeFi simulation',
-    summary: 'Plan liquidity provisioning and swap scenarios.',
-    difficulty: 'Intermediate',
-    goals: ['Understand AMM mechanics', 'Summarize fee calculations', 'Build a risk checklist'],
-    tasks: [
-      'Explain how fees accrue in a liquidity pool',
-      'List price movement factors during swaps',
-      'Draft a risk checklist'
-    ]
-  },
-  {
     slug: 'utxo-simulation',
     title: 'UTXO creation and transfer simulation',
     summary: 'Create UTXOs, send funds, and visualize how outputs split and merge.',
