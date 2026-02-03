@@ -51,6 +51,22 @@ export const sessions: PracticeSession[] = [
       'List price movement factors during swaps',
       'Draft a risk checklist'
     ]
+  },
+  {
+    slug: 'utxo-simulation',
+    title: 'UTXO creation and transfer simulation',
+    summary: 'Create UTXOs, send funds, and visualize how outputs split and merge.',
+    difficulty: 'Foundations',
+    goals: [
+      'Understand how UTXOs represent spendable balances',
+      'Practice building transactions with multiple inputs and outputs',
+      'Visualize how UTXOs split or merge after a transfer'
+    ],
+    tasks: [
+      'Initialize a wallet with a custom or random address',
+      'Send funds to a new address and inspect the resulting outputs',
+      'Clear the ledger and start again to compare behaviors'
+    ]
   }
 ];
 

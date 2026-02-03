@@ -3,6 +3,7 @@
   import Card from '$components/ui/card/card.svelte';
   import Button from '$components/ui/button/button.svelte';
   import BitcoinPowSimulator from '$lib/components/practice/BitcoinPowSimulator.svelte';
+  import UtxoSimulator from '$lib/components/practice/UtxoSimulator.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -80,6 +81,8 @@
 
   {#if data.session.slug === 'intro-wallet'}
     <BitcoinPowSimulator />
+  {:else if data.session.slug === 'utxo-simulation'}
+    <UtxoSimulator />
   {/if}
 
   <Card className="" style="margin-top: 1.5rem;">
