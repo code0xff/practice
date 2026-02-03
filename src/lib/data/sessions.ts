@@ -10,18 +10,18 @@ export type PracticeSession = {
 export const sessions: PracticeSession[] = [
   {
     slug: 'intro-wallet',
-    title: 'Wallet creation and key management',
-    summary: 'Walk through how private keys, public keys, and addresses are generated.',
+    title: 'Bitcoin PoW visualization',
+    summary: 'Simulate proof-of-work mining and watch difficulty adjust to your target block time.',
     difficulty: 'Beginner',
     goals: [
-      'Understand the wallet creation flow',
-      'Define seed phrase storage principles',
-      'Prepare to use a testnet wallet'
+      'Understand how proof-of-work difficulty influences block time',
+      'Visualize nonce search and hash targets',
+      'Interpret basic block metadata'
     ],
     tasks: [
-      'Create a new wallet in the simulator',
-      'List safe ways to store seed phrases and private keys',
-      'Compare common address formats'
+      'Set a target block time and observe difficulty adjustments',
+      'Start and stop mining while watching the nonce counter',
+      'Clear stored blocks to reset the simulation'
     ]
   },
   {

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Card from '$components/ui/card/card.svelte';
   import Button from '$components/ui/button/button.svelte';
+  import BitcoinPowSimulator from '$lib/components/practice/BitcoinPowSimulator.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -76,6 +77,10 @@
       </ol>
     </Card>
   </div>
+
+  {#if data.session.slug === 'intro-wallet'}
+    <BitcoinPowSimulator />
+  {/if}
 
   <Card className="" style="margin-top: 1.5rem;">
     <h3>Session notes</h3>
