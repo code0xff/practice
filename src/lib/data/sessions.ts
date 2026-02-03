@@ -83,6 +83,22 @@ export const sessions: PracticeSession[] = [
       'Review the saved input/output pairs below the form',
       'Clear the history and repeat with new inputs'
     ]
+  },
+  {
+    slug: 'merkle-tree',
+    title: 'Merkle tree explorer',
+    summary: 'Build a Merkle tree, inspect hashes, and verify proofs.',
+    difficulty: 'Foundations',
+    goals: [
+      'Understand how Merkle trees aggregate hashes',
+      'See how leaf values influence the root',
+      'Verify proofs against a chosen root hash'
+    ],
+    tasks: [
+      'Set a depth and fill in leaf values',
+      'Generate a proof for a selected leaf',
+      'Verify the proof using the Merkle root'
+    ]
   }
 ];
 
