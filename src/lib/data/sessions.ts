@@ -67,6 +67,22 @@ export const sessions: PracticeSession[] = [
       'Send funds to a new address and inspect the resulting outputs',
       'Clear the ledger and start again to compare behaviors'
     ]
+  },
+  {
+    slug: 'keccak-hash',
+    title: 'Keccak256 hashing playground',
+    summary: 'Hash custom inputs with Keccak256 and review recent results.',
+    difficulty: 'Beginner',
+    goals: [
+      'Understand how a cryptographic hash maps input to output',
+      'Experiment with how small input changes alter the hash',
+      'Build intuition for fixed-length hash outputs'
+    ],
+    tasks: [
+      'Enter multiple inputs and compare their hashes',
+      'Review the saved input/output pairs below the form',
+      'Clear the history and repeat with new inputs'
+    ]
   }
 ];
 

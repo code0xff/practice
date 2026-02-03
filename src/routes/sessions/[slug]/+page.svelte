@@ -4,6 +4,7 @@
   import Button from '$components/ui/button/button.svelte';
   import BitcoinPowSimulator from '$lib/components/practice/BitcoinPowSimulator.svelte';
   import UtxoSimulator from '$lib/components/practice/UtxoSimulator.svelte';
+  import KeccakHashPractice from '$lib/components/practice/KeccakHashPractice.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -83,6 +84,8 @@
     <BitcoinPowSimulator />
   {:else if data.session.slug === 'utxo-simulation'}
     <UtxoSimulator />
+  {:else if data.session.slug === 'keccak-hash'}
+    <KeccakHashPractice />
   {/if}
 
   <Card className="" style="margin-top: 1.5rem;">
