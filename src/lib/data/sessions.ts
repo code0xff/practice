@@ -99,6 +99,22 @@ export const sessions: PracticeSession[] = [
       'Generate a proof for a selected leaf',
       'Verify the proof using the Merkle root'
     ]
+  },
+  {
+    slug: 'dh-chat',
+    title: 'Diffie-Hellman encrypted chat',
+    summary: 'Exchange secp256k1 keys, derive shared secrets, and encrypt messages.',
+    difficulty: 'Intermediate',
+    goals: [
+      'Generate secp256k1 key pairs and share public keys',
+      'Derive a shared secret with Diffie-Hellman',
+      'Encrypt and decrypt messages using the shared secret'
+    ],
+    tasks: [
+      'Generate keys for both participants',
+      'Derive shared secrets after exchanging public keys',
+      'Send an encrypted message and decrypt it on the other side'
+    ]
   }
 ];
 
