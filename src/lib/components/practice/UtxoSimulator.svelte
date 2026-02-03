@@ -21,10 +21,10 @@
   let transactions: TxRecord[] = [];
   let initAddress = '';
   let initAmount = 1;
-  let destinationAddress = '';
-  let sendAmount = 0.5;
+  let recipients: { id: string; address: string; amount: number }[] = [];
   let selectedInputs = new Set<string>();
   let errorMessage = '';
+  let lastFee = 0;
 
   const generateRandomAddress = () => {
     const bytes = new Uint8Array(10);
@@ -86,37 +86,35 @@
       errorMessage = 'Select at least one UTXO to spend.';
       return;
     }
-    if (!destinationAddress.trim()) {
-      errorMessage = 'Enter a destination address.';
+    if (recipients.length === 0) {
+      errorMessage = 'Add at least one recipient.';
       return;
     }
-    if (sendAmount <= 0) {
-      errorMessage = 'Send amount must be greater than zero.';
+    const invalidRecipient = recipients.find(
+      (recipient) => !recipient.address.trim() || recipient.amount <= 0
+    );
+    if (invalidRecipient) {
+      errorMessage = 'Each recipient needs an address and a positive amount.';
       return;
     }
     const inputs = utxos.filter((utxo) => selectedInputs.has(utxo.id));
     const totalInput = inputs.reduce((sum, utxo) => sum + utxo.amount, 0);
-    if (totalInput < sendAmount) {
-      errorMessage = 'Selected inputs do not cover the send amount.';
+    const totalOutput = recipients.reduce((sum, recipient) => sum + recipient.amount, 0);
+    if (totalInput < totalOutput) {
+      errorMessage = 'Selected inputs do not cover the recipient totals.';
       return;
     }
 
     const outputs: Utxo[] = [];
-    outputs.push({
-      id: crypto.randomUUID(),
-      address: destinationAddress.trim(),
-      amount: Number(sendAmount.toFixed(8))
-    });
-
-    const change = Number((totalInput - sendAmount).toFixed(8));
-    if (change > 0) {
-      const changeAddress = inputs[0]?.address ?? initAddress.trim();
+    recipients.forEach((recipient) => {
       outputs.push({
         id: crypto.randomUUID(),
-        address: changeAddress,
-        amount: change
+        address: recipient.address.trim(),
+        amount: Number(recipient.amount.toFixed(8))
       });
-    }
+    });
+    const fee = Number((totalInput - totalOutput).toFixed(8));
+    lastFee = fee;
 
     const nextUtxos = utxos.filter((utxo) => !selectedInputs.has(utxo.id)).concat(outputs);
     const tx: TxRecord = {
@@ -128,7 +126,42 @@
     utxos = nextUtxos;
     transactions = [tx, ...transactions].slice(0, 5);
     selectedInputs = new Set();
+    recipients = [{ id: crypto.randomUUID(), address: '', amount: 0 }];
     saveState(utxos, transactions);
+  };
+
+  const updateRecipientAddress = (index: number, event: Event) => {
+    const target = event.currentTarget as HTMLInputElement | null;
+    const value = target ? target.value : '';
+    recipients = recipients.map((item, idx) =>
+      idx === index ? { ...item, address: value } : item
+    );
+  };
+
+  const updateRecipientAmount = (index: number, event: Event) => {
+    const target = event.currentTarget as HTMLInputElement | null;
+    const value = target ? Number(target.value) : 0;
+    recipients = recipients.map((item, idx) =>
+      idx === index ? { ...item, amount: value } : item
+    );
+  };
+
+  const randomizeRecipient = (index: number) => {
+    recipients = recipients.map((item, idx) =>
+      idx === index ? { ...item, address: generateRandomAddress() } : item
+    );
+  };
+
+  const removeRecipient = (id: string) => {
+    if (recipients.length === 1) return;
+    recipients = recipients.filter((item) => item.id !== id);
+  };
+
+  const addRecipient = () => {
+    recipients = [
+      ...recipients,
+      { id: crypto.randomUUID(), address: generateRandomAddress(), amount: 0 }
+    ];
   };
 
   const clearLedger = () => {
@@ -136,8 +169,9 @@
     transactions = [];
     selectedInputs = new Set();
     initAddress = '';
-    destinationAddress = '';
+    recipients = [{ id: crypto.randomUUID(), address: '', amount: 0 }];
     errorMessage = '';
+    lastFee = 0;
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TX_KEY);
   };
@@ -145,7 +179,9 @@
   onMount(() => {
     loadState();
     initAddress = generateRandomAddress();
-    destinationAddress = generateRandomAddress();
+    recipients = [
+      { id: crypto.randomUUID(), address: generateRandomAddress(), amount: 0.5 }
+    ];
   });
 </script>
 
@@ -198,24 +234,60 @@
       {/each}
     {/if}
   </div>
-  <div class="form-grid">
-    <label>
-      Destination address
-      <input type="text" bind:value={destinationAddress} placeholder="bc1q..." />
-    </label>
-    <label>
-      Send amount (BTC)
-      <input type="number" min="0" step="0.00000001" bind:value={sendAmount} />
-    </label>
-    <div class="button-row">
-      <button class="secondary" on:click={() => (destinationAddress = generateRandomAddress())}>
-        Random destination
-      </button>
-      <button class="primary" on:click={sendTransaction} disabled={utxos.length === 0}>
-        Send
-      </button>
-    </div>
+  <div class="recipient-list">
+    {#each recipients as recipient, index (recipient.id)}
+      <div class="recipient-row">
+        <label>
+          Recipient address
+          <input
+            type="text"
+            placeholder="bc1q..."
+            value={recipient.address}
+            on:input={(event) => updateRecipientAddress(index, event)}
+          />
+        </label>
+        <label>
+          Amount (BTC)
+          <input
+            type="number"
+            min="0"
+            step="0.00000001"
+            value={recipient.amount}
+            on:input={(event) => updateRecipientAmount(index, event)}
+          />
+        </label>
+        <div class="recipient-actions">
+          <button
+            class="secondary"
+            on:click={() => randomizeRecipient(index)}
+          >
+            Random address
+          </button>
+          <button
+            class="ghost"
+            disabled={recipients.length === 1}
+            on:click={() => removeRecipient(recipient.id)}
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    {/each}
   </div>
+  <div class="button-row">
+    <button
+      class="secondary"
+      on:click={addRecipient}
+    >
+      Add recipient
+    </button>
+    <button class="primary" on:click={sendTransaction} disabled={utxos.length === 0}>
+      Send
+    </button>
+  </div>
+  <p class="subtle">
+    Total input minus total recipient amounts is treated as a fee. Current fee: {lastFee} BTC
+  </p>
   {#if errorMessage}
     <p class="error">{errorMessage}</p>
   {/if}
