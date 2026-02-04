@@ -25,6 +25,34 @@ export const sessions: PracticeSession[] = [
     ]
   },
   {
+    slug: 'smart-contract',
+    title: 'Smart contract deployment flow',
+    summary: 'Review contract structure and build a pre-deployment checklist.',
+    difficulty: 'Foundations',
+    goals: [
+      'Understand the deployment stages',
+      'Identify how gas fees are calculated',
+      'Complete a deployment checklist'
+    ],
+    tasks: [
+      'Read the structure of a simple token contract',
+      'Outline preparation steps for each deployment stage',
+      'Check expected costs on a testnet'
+    ]
+  },
+  {
+    slug: 'defi-flow',
+    title: 'DeFi simulation',
+    summary: 'Plan liquidity provisioning and swap scenarios.',
+    difficulty: 'Intermediate',
+    goals: ['Understand AMM mechanics', 'Summarize fee calculations', 'Build a risk checklist'],
+    tasks: [
+      'Explain how fees accrue in a liquidity pool',
+      'List price movement factors during swaps',
+      'Draft a risk checklist'
+    ]
+  },
+  {
     slug: 'utxo-simulation',
     title: 'UTXO creation and transfer simulation',
     summary: 'Create UTXOs, send funds, and visualize how outputs split and merge.',
@@ -86,6 +114,22 @@ export const sessions: PracticeSession[] = [
       'Generate keys for both participants',
       'Derive shared secrets after exchanging public keys',
       'Send an encrypted message and decrypt it on the other side'
+    ]
+  },
+  {
+    slug: 'pbft-simulation',
+    title: 'PBFT consensus simulation',
+    summary: 'Simulate propose, prevote, precommit, and commit rounds across four nodes.',
+    difficulty: 'Foundations',
+    goals: [
+      'Understand the PBFT phases and voting thresholds',
+      'Observe round-robin proposers and round changes',
+      'Track how votes lead to commit decisions'
+    ],
+    tasks: [
+      'Propose a block and collect prevotes',
+      'Advance to precommit when 2f+1 votes are reached',
+      'Trigger a round change when votes fail'
     ]
   }
 ];

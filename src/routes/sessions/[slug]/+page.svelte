@@ -7,6 +7,7 @@
   import KeccakHashPractice from '$lib/components/practice/KeccakHashPractice.svelte';
   import MerkleTreePractice from '$lib/components/practice/MerkleTreePractice.svelte';
   import DiffieHellmanChatPractice from '$lib/components/practice/DiffieHellmanChatPractice.svelte';
+  import PbftSimulator from '$lib/components/practice/PbftSimulator.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -92,6 +93,8 @@
     <MerkleTreePractice />
   {:else if data.session.slug === 'dh-chat'}
     <DiffieHellmanChatPractice />
+  {:else if data.session.slug === 'pbft-simulation'}
+    <PbftSimulator />
   {/if}
 
   <Card className="" style="margin-top: 1.5rem;">
