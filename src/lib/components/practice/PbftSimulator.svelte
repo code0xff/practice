@@ -18,7 +18,7 @@
   let proposerIndex = 0;
   let phase: 'propose' | 'prevote' | 'precommit' | 'commit' | 'round-change' = 'propose';
   let message = '';
-  let committed: { round: number; proposer: string; message: string }[] = [];
+  let committed: { height: number; round: number; proposer: string; message: string }[] = [];
   let countdown = PHASE_SECONDS;
   let timer: ReturnType<typeof setInterval> | null = null;
   let nodes: NodeState[] = NODE_IDS.map((id, index) => ({
@@ -86,6 +86,12 @@
       if (idx !== index) return node;
       return { ...node, [stage]: value };
     });
+    
+    if (stage === 'prevote') {
+      advancePrevote();
+    } else  {
+      advancePrecommit();
+    }
   };
 
   const tallyVotes = (stage: 'prevote' | 'precommit') => {
@@ -112,11 +118,11 @@
     if (yes >= QUORUM) {
       phase = 'commit';
       committed = [
-        { round, proposer: NODE_IDS[proposerIndex], message },
+        { height: committed.length + 1, round, proposer: NODE_IDS[proposerIndex], message },
         ...committed
       ];
       stopTimer();
-      nextRound();
+      newRound();
     } else if (no >= 1 && pending === 0) {
       triggerRoundChange();
     }
@@ -128,9 +134,19 @@
     nextRound();
   };
 
+  const newRound = () => {
+    round = 1;
+    proposerIndex = nextProposer();
+    updateRoles();
+    resetVotes();
+    message = '';
+    phase = 'propose';
+    countdown = PHASE_SECONDS;
+  }
+
   const nextRound = () => {
     round += 1;
-    proposerIndex = (proposerIndex + 1) % NODE_IDS.length;
+    proposerIndex = nextProposer();
     updateRoles();
     resetVotes();
     message = '';
@@ -150,22 +166,8 @@
     countdown = PHASE_SECONDS;
   };
 
-  $: if (phase === 'prevote') {
-    const { yes, no, pending } = tallyVotes('prevote');
-    if (yes >= QUORUM) {
-      advancePrevote();
-    } else if (no >= 1 && pending === 0) {
-      triggerRoundChange();
-    }
-  }
-
-  $: if (phase === 'precommit') {
-    const { yes, no, pending } = tallyVotes('precommit');
-    if (yes >= QUORUM) {
-      advancePrecommit();
-    } else if (no >= 1 && pending === 0) {
-      triggerRoundChange();
-    }
+  const nextProposer = (): number => {
+    return (proposerIndex + 1) % NODE_IDS.length;
   }
 
   onDestroy(() => {
@@ -178,7 +180,7 @@
     <div>
       <h3>PBFT round simulation</h3>
       <p class="subtle">
-        Round {round} · Proposer {NODE_IDS[proposerIndex]} · Phase {phase}
+        Block {committed.length + 1} · Round {round} · Proposer {NODE_IDS[proposerIndex]} · Phase {phase}
       </p>
     </div>
     <button class="ghost" on:click={resetSimulation}>Reset</button>
@@ -280,6 +282,7 @@
     <div class="commit-list">
       {#each committed as entry}
         <div class="commit-row">
+          <span class="label">Block {entry.height}</span>
           <span class="label">Round {entry.round}</span>
           <span class="hash" title={entry.message}>{shortHash(entry.message)}</span>
           <span class="badge">Proposer {entry.proposer}</span>
