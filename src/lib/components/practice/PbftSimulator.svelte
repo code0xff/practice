@@ -98,13 +98,10 @@
   const advancePrevote = () => {
     if (phase !== 'prevote') return;
     const { yes, no, pending } = tallyVotes('prevote');
-    if (pending > 0) return;
     if (yes >= QUORUM) {
       phase = 'precommit';
       startTimer();
-    } else if (no >= 1) {
-      triggerRoundChange();
-    } else {
+    } else if (no >= 1 && pending === 0) {
       triggerRoundChange();
     }
   };
@@ -112,7 +109,6 @@
   const advancePrecommit = () => {
     if (phase !== 'precommit') return;
     const { yes, no, pending } = tallyVotes('precommit');
-    if (pending > 0) return;
     if (yes >= QUORUM) {
       phase = 'commit';
       committed = [
@@ -121,9 +117,7 @@
       ];
       stopTimer();
       nextRound();
-    } else if (no >= 1) {
-      triggerRoundChange();
-    } else {
+    } else if (no >= 1 && pending === 0) {
       triggerRoundChange();
     }
   };
