@@ -96,6 +96,7 @@
   };
 
   const advancePrevote = () => {
+    if (phase !== 'prevote') return;
     const { yes, no, pending } = tallyVotes('prevote');
     if (pending > 0) return;
     if (yes >= QUORUM) {
@@ -109,6 +110,7 @@
   };
 
   const advancePrecommit = () => {
+    if (phase !== 'precommit') return;
     const { yes, no, pending } = tallyVotes('precommit');
     if (pending > 0) return;
     if (yes >= QUORUM) {
@@ -154,6 +156,24 @@
     countdown = PHASE_SECONDS;
   };
 
+  $: if (phase === 'prevote') {
+    const { yes, no, pending } = tallyVotes('prevote');
+    if (yes >= QUORUM) {
+      advancePrevote();
+    } else if (no >= 1 && pending === 0) {
+      triggerRoundChange();
+    }
+  }
+
+  $: if (phase === 'precommit') {
+    const { yes, no, pending } = tallyVotes('precommit');
+    if (yes >= QUORUM) {
+      advancePrecommit();
+    } else if (no >= 1 && pending === 0) {
+      triggerRoundChange();
+    }
+  }
+
   onDestroy(() => {
     stopTimer();
   });
@@ -187,15 +207,6 @@
     <button class="primary" on:click={proposeBlock} disabled={phase !== 'propose'}>
       Propose block
     </button>
-    <button class="secondary" on:click={triggerRoundChange}>
-      Trigger round change
-    </button>
-    <button class="secondary" on:click={advancePrevote} disabled={phase !== 'prevote'}>
-      Check prevote
-    </button>
-    <button class="secondary" on:click={advancePrecommit} disabled={phase !== 'precommit'}>
-      Check precommit
-    </button>
   </div>
 </section>
 
@@ -223,6 +234,15 @@
               No
             </button>
           </div>
+          <ul class="vote-log">
+            {#each nodes as peer}
+              {#if peer.id !== node.id}
+                <li>
+                  {peer.id}: {peer.prevote ?? 'Pending'}
+                </li>
+              {/if}
+            {/each}
+          </ul>
         </div>
       {:else if phase === 'precommit'}
         <div class="phase">
@@ -241,6 +261,15 @@
               No
             </button>
           </div>
+          <ul class="vote-log">
+            {#each nodes as peer}
+              {#if peer.id !== node.id}
+                <li>
+                  {peer.id}: {peer.precommit ?? 'Pending'}
+                </li>
+              {/if}
+            {/each}
+          </ul>
         </div>
       {:else}
         <p class="subtle">Votes open during prevote or precommit.</p>
@@ -335,12 +364,6 @@
     border-color: var(--primary);
   }
 
-  .secondary {
-    background: transparent;
-    border-color: var(--border);
-    color: var(--text);
-  }
-
   .ghost {
     background: transparent;
     border-color: transparent;
@@ -400,6 +423,16 @@
   .vote-row button.active {
     background: var(--text);
     color: var(--background);
+  }
+
+  .vote-log {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--muted-text);
   }
 
   .commit-list {
