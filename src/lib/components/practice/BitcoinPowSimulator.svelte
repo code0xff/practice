@@ -20,7 +20,7 @@
   const STORAGE_KEY = 'chainlab-pow-blocks';
   const DEFAULT_TARGET_BLOCK_TIME = 10;
   const DEFAULT_DIFFICULTY = 3;
-  const MAX_DIFFICULTY = 6;
+  const MAX_DIFFICULTY = 10;
   const MIN_DIFFICULTY = 1;
 
   let blocks: PowBlock[] = [];
@@ -32,6 +32,10 @@
   let activeWorkers: Worker[] = [];
   let workerStats: WorkerStat[] = [];
   let latestHashPreview = '';
+
+  // ✅ 라운드/레이스 방지용
+  let roundId = 0;
+  let hasWinner = false;
 
   const saveBlocks = (nextBlocks: PowBlock[]) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBlocks));
@@ -66,14 +70,6 @@
       const toHex = (buffer) =>
         Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
-      const fromHex = (hex) => {
-        const bytes = new Uint8Array(hex.length / 2);
-        for (let i = 0; i < bytes.length; i += 1) {
-          bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-        }
-        return bytes;
-      };
-
       const hash256 = async (text) => {
         const first = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
         const second = await crypto.subtle.digest('SHA-256', first);
@@ -83,28 +79,41 @@
       let running = false;
 
       onmessage = async (event) => {
-        const { type, payload } = event.data;
+        const { type, payload } = event.data ?? {};
         if (type === 'stop') {
           running = false;
           return;
         }
-
         if (type !== 'start') return;
 
         running = true;
-        const { workerId, height, prevHash, difficulty, startNonce, step } = payload;
+
+        const {
+          roundId,
+          workerId,
+          height,
+          prevHash,
+          difficulty,
+          startNonce,
+          step,
+          progressIntervalMs = 100,
+        } = payload;
+
         let nonce = startNonce;
+        let lastProgressAt = 0;
 
         while (running) {
           const input = height + ':' + prevHash + ':' + nonce;
           const hash = await hash256(input);
 
-          if (nonce % 200 === 0) {
-            postMessage({ type: 'progress', payload: { workerId, nonce, hash } });
+          const now = Date.now();
+          if (now - lastProgressAt >= progressIntervalMs) {
+            postMessage({ type: 'progress', payload: { roundId, workerId, nonce, hash } });
+            lastProgressAt = now;
           }
 
           if (hash.startsWith('0'.repeat(difficulty))) {
-            postMessage({ type: 'found', payload: { workerId, nonce, hash } });
+            postMessage({ type: 'found', payload: { roundId, workerId, nonce, hash } });
             running = false;
             return;
           }
@@ -120,7 +129,11 @@
 
   const stopWorkers = () => {
     activeWorkers.forEach((worker) => {
-      worker.postMessage({ type: 'stop' });
+      try {
+        worker.postMessage({ type: 'stop' });
+      } catch {
+        // ignore
+      }
       worker.terminate();
     });
     activeWorkers = [];
@@ -130,7 +143,13 @@
     const prevHash = blocks.length ? blocks[blocks.length - 1].hash : '0'.repeat(64);
     const height = blocks.length + 1;
 
+    // ✅ 새 라운드 토큰
+    roundId += 1;
+    const myRound = roundId;
+    hasWinner = false;
+
     stopWorkers();
+
     workerStats = Array.from({ length: nodeCount }, (_, index) => ({
       id: `Node-${index + 1}`,
       latestNonce: 0,
@@ -141,24 +160,47 @@
       const worker = createMiningWorker();
       const workerId = `Node-${i + 1}`;
 
+      // ✅ worker가 조용히 죽는 문제 추적
+      worker.onerror = (e) => {
+        console.error('[worker error]', workerId, e);
+      };
+      worker.onmessageerror = (e) => {
+        console.error('[worker messageerror]', workerId, e);
+      };
+
       worker.onmessage = (event: MessageEvent) => {
         if (!isRunning) return;
 
-        if (event.data.type === 'progress') {
-          const progress = event.data.payload as { workerId: string; nonce: number; hash: string };
+        const { type, payload } = event.data ?? {};
+        if (!payload) return;
+
+        // ✅ 라운드 불일치 메시지는 무시
+        if (payload.roundId !== myRound) return;
+
+        if (type === 'progress') {
+          const progress = payload as { roundId: number; workerId: string; nonce: number; hash: string };
+
           workerStats = workerStats.map((stat) =>
             stat.id === progress.workerId
               ? { ...stat, latestNonce: progress.nonce, latestHash: progress.hash }
               : stat
           );
+
           latestHashPreview = progress.hash;
           return;
         }
 
-        if (event.data.type === 'found') {
-          const found = event.data.payload as { workerId: string; nonce: number; hash: string };
+        if (type === 'found') {
+          if (hasWinner) return; // ✅ 이미 승자 처리했으면 무시
+          hasWinner = true;
+
+          // ✅ 즉시 다른 워커들 중지 (중요)
+          stopWorkers();
+
+          const found = payload as { roundId: number; workerId: string; nonce: number; hash: string };
           const now = Date.now();
           const blockTimeMs = now - lastBlockTimestamp;
+
           const nextBlock: PowBlock = {
             height,
             timestamp: now,
@@ -184,12 +226,14 @@
       worker.postMessage({
         type: 'start',
         payload: {
+          roundId: myRound,             // ✅ 라운드 토큰 전달
           workerId,
           height,
           prevHash,
           difficulty,
           startNonce: randomStart + i,
-          step: nodeCount
+          step: nodeCount,
+          progressIntervalMs: 100       // ✅ UI 업데이트 주기
         }
       });
 
