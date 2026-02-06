@@ -33,7 +33,6 @@
   let workerStats: WorkerStat[] = [];
   let latestHashPreview = '';
 
-  // ✅ 라운드/레이스 방지용
   let roundId = 0;
   let hasWinner = false;
 
@@ -174,7 +173,6 @@
         const { type, payload } = event.data ?? {};
         if (!payload) return;
 
-        // ✅ 라운드 불일치 메시지는 무시
         if (payload.roundId !== myRound) return;
 
         if (type === 'progress') {
@@ -186,18 +184,18 @@
               : stat
           );
 
-          latestHashPreview = progress.hash;
           return;
         }
 
         if (type === 'found') {
-          if (hasWinner) return; // ✅ 이미 승자 처리했으면 무시
+          if (hasWinner) return;
           hasWinner = true;
 
-          // ✅ 즉시 다른 워커들 중지 (중요)
           stopWorkers();
 
           const found = payload as { roundId: number; workerId: string; nonce: number; hash: string };
+          latestHashPreview = found.hash;
+
           const now = Date.now();
           const blockTimeMs = now - lastBlockTimestamp;
 
