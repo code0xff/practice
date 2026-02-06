@@ -8,6 +8,13 @@
     hash: string;
     difficulty: number;
     blockTimeMs: number;
+    miner: string;
+  };
+
+  type WorkerStat = {
+    id: string;
+    latestNonce: number;
+    latestHash: string;
   };
 
   const STORAGE_KEY = 'chainlab-pow-blocks';
@@ -15,17 +22,16 @@
   const DEFAULT_DIFFICULTY = 3;
   const MAX_DIFFICULTY = 6;
   const MIN_DIFFICULTY = 1;
-  const HASHES_PER_TICK = 500;
-  const TICK_INTERVAL_MS = 80;
 
   let blocks: PowBlock[] = [];
   let isRunning = false;
   let difficulty = DEFAULT_DIFFICULTY;
   let targetBlockTime = DEFAULT_TARGET_BLOCK_TIME;
-  let nonceCursor = 0;
+  let nodeCount = 2;
   let lastBlockTimestamp = Date.now();
+  let activeWorkers: Worker[] = [];
+  let workerStats: WorkerStat[] = [];
   let latestHashPreview = '';
-  let intervalId: ReturnType<typeof setInterval> | null = null;
 
   const saveBlocks = (nextBlocks: PowBlock[]) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBlocks));
@@ -40,15 +46,10 @@
     }
   };
 
-  const computeHash = (nonce: number, prevHash: string, height: number) => {
-    const input = `${height}-${prevHash}-${nonce}`;
-    let hash = 2166136261;
-    for (let i = 0; i < input.length; i += 1) {
-      hash ^= input.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    const hex = (hash >>> 0).toString(16).padStart(8, '0');
-    return `${hex}${hex}`;
+  const shortHash = (value: string) => {
+    if (!value) return '—';
+    if (value.length <= 14) return value;
+    return `${value.slice(0, 8)}…${value.slice(-4)}`;
   };
 
   const adjustDifficulty = (blockTimeMs: number) => {
@@ -60,33 +61,139 @@
     }
   };
 
-  const mineTick = () => {
-    if (!isRunning) return;
-    const prevHash = blocks.length ? blocks[blocks.length - 1].hash : 'genesis';
-    const height = blocks.length;
+  const createMiningWorker = () => {
+    const source = `
+      const toHex = (buffer) =>
+        Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
-    for (let i = 0; i < HASHES_PER_TICK; i += 1) {
-      const hash = computeHash(nonceCursor, prevHash, height);
-      latestHashPreview = hash;
-      if (hash.startsWith('0'.repeat(difficulty))) {
-        const now = Date.now();
-        const blockTimeMs = now - lastBlockTimestamp;
-        const nextBlock: PowBlock = {
-          height: height + 1,
-          timestamp: now,
-          nonce: nonceCursor,
-          hash,
+      const fromHex = (hex) => {
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < bytes.length; i += 1) {
+          bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+        }
+        return bytes;
+      };
+
+      const hash256 = async (text) => {
+        const first = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+        const second = await crypto.subtle.digest('SHA-256', first);
+        return toHex(second);
+      };
+
+      let running = false;
+
+      onmessage = async (event) => {
+        const { type, payload } = event.data;
+        if (type === 'stop') {
+          running = false;
+          return;
+        }
+
+        if (type !== 'start') return;
+
+        running = true;
+        const { workerId, height, prevHash, difficulty, startNonce, step } = payload;
+        let nonce = startNonce;
+
+        while (running) {
+          const input = height + ':' + prevHash + ':' + nonce;
+          const hash = await hash256(input);
+
+          if (nonce % 200 === 0) {
+            postMessage({ type: 'progress', payload: { workerId, nonce, hash } });
+          }
+
+          if (hash.startsWith('0'.repeat(difficulty))) {
+            postMessage({ type: 'found', payload: { workerId, nonce, hash } });
+            running = false;
+            return;
+          }
+
+          nonce += step;
+        }
+      };
+    `;
+
+    const blob = new Blob([source], { type: 'application/javascript' });
+    return new Worker(URL.createObjectURL(blob));
+  };
+
+  const stopWorkers = () => {
+    activeWorkers.forEach((worker) => {
+      worker.postMessage({ type: 'stop' });
+      worker.terminate();
+    });
+    activeWorkers = [];
+  };
+
+  const startRound = () => {
+    const prevHash = blocks.length ? blocks[blocks.length - 1].hash : '0'.repeat(64);
+    const height = blocks.length + 1;
+
+    stopWorkers();
+    workerStats = Array.from({ length: nodeCount }, (_, index) => ({
+      id: `Node-${index + 1}`,
+      latestNonce: 0,
+      latestHash: ''
+    }));
+
+    for (let i = 0; i < nodeCount; i += 1) {
+      const worker = createMiningWorker();
+      const workerId = `Node-${i + 1}`;
+
+      worker.onmessage = (event: MessageEvent) => {
+        if (!isRunning) return;
+
+        if (event.data.type === 'progress') {
+          const progress = event.data.payload as { workerId: string; nonce: number; hash: string };
+          workerStats = workerStats.map((stat) =>
+            stat.id === progress.workerId
+              ? { ...stat, latestNonce: progress.nonce, latestHash: progress.hash }
+              : stat
+          );
+          latestHashPreview = progress.hash;
+          return;
+        }
+
+        if (event.data.type === 'found') {
+          const found = event.data.payload as { workerId: string; nonce: number; hash: string };
+          const now = Date.now();
+          const blockTimeMs = now - lastBlockTimestamp;
+          const nextBlock: PowBlock = {
+            height,
+            timestamp: now,
+            nonce: found.nonce,
+            hash: found.hash,
+            difficulty,
+            blockTimeMs,
+            miner: found.workerId
+          };
+
+          blocks = [...blocks, nextBlock];
+          saveBlocks(blocks);
+          lastBlockTimestamp = now;
+          adjustDifficulty(blockTimeMs);
+
+          if (isRunning) {
+            startRound();
+          }
+        }
+      };
+
+      const randomStart = Math.floor(Math.random() * 1_000_000_000);
+      worker.postMessage({
+        type: 'start',
+        payload: {
+          workerId,
+          height,
+          prevHash,
           difficulty,
-          blockTimeMs
-        };
-        blocks = [...blocks, nextBlock];
-        saveBlocks(blocks);
-        lastBlockTimestamp = now;
-        nonceCursor = 0;
-        adjustDifficulty(blockTimeMs);
-        return;
-      }
-      nonceCursor += 1;
+          startNonce: randomStart + i,
+          step: nodeCount
+        }
+      });
+
+      activeWorkers.push(worker);
     }
   };
 
@@ -96,24 +203,21 @@
     if (!blocks.length) {
       lastBlockTimestamp = Date.now();
     }
-    intervalId = setInterval(mineTick, TICK_INTERVAL_MS);
+    startRound();
   };
 
   const stop = () => {
     isRunning = false;
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
+    stopWorkers();
   };
 
   const clearBlocks = () => {
     stop();
     blocks = [];
-    nonceCursor = 0;
     latestHashPreview = '';
     difficulty = DEFAULT_DIFFICULTY;
     lastBlockTimestamp = Date.now();
+    workerStats = [];
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -133,42 +237,58 @@
 <section class="pow-controls">
   <div class="control-card">
     <div>
-      <h3>Simulation controls</h3>
+      <h3>Multi-node Hash256 mining</h3>
       <p class="subtle">
-        Set a target block time, then start mining to watch difficulty adapt and blocks appear.
+        Nodes mine in parallel with double SHA-256 (Hash256). Winning blocks are broadcast and all
+        nodes immediately begin the next round.
       </p>
     </div>
     <div class="control-grid">
       <label>
         Target block time (seconds)
-        <input
-          type="number"
-          min="2"
-          max="60"
-          step="1"
-          bind:value={targetBlockTime}
-          disabled={isRunning}
-        />
+        <input type="number" min="2" max="60" step="1" bind:value={targetBlockTime} disabled={isRunning} />
+      </label>
+      <label>
+        Node count (workers)
+        <input type="number" min="1" max="4" step="1" bind:value={nodeCount} disabled={isRunning} />
       </label>
       <div class="stat">
         <span class="stat-label">Difficulty</span>
         <span class="stat-value">{difficulty}</span>
       </div>
       <div class="stat">
-        <span class="stat-label">Current nonce</span>
-        <span class="stat-value">{nonceCursor}</span>
-      </div>
-      <div class="stat">
         <span class="stat-label">Latest hash</span>
-        <span class="stat-value hash">{latestHashPreview || '—'}</span>
+        <span class="stat-value hash" title={latestHashPreview}>{shortHash(latestHashPreview)}</span>
       </div>
     </div>
     <div class="button-row">
       <button class="primary" on:click={start} disabled={isRunning}>Start</button>
       <button class="secondary" on:click={stop} disabled={!isRunning}>Stop</button>
-      <button class="ghost" on:click={clearBlocks}>Clear blocks</button>
+      <button class="ghost" on:click={clearBlocks}>Reset</button>
     </div>
   </div>
+</section>
+
+<section>
+  <h3>Worker status</h3>
+  {#if workerStats.length === 0}
+    <p class="subtle">No active workers. Start mining to spawn worker threads.</p>
+  {:else}
+    <div class="table">
+      <div class="table-row header">
+        <span>Node</span>
+        <span>Nonce</span>
+        <span>Latest hash</span>
+      </div>
+      {#each workerStats as stat (stat.id)}
+        <div class="table-row workers">
+          <span>{stat.id}</span>
+          <span>{stat.latestNonce}</span>
+          <span class="hash" title={stat.latestHash}>{shortHash(stat.latestHash)}</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </section>
 
 <section>
@@ -179,6 +299,7 @@
     <div class="table">
       <div class="table-row header">
         <span>Height</span>
+        <span>Miner</span>
         <span>Nonce</span>
         <span>Difficulty</span>
         <span>Block time</span>
@@ -187,10 +308,11 @@
       {#each blocks as block (block.hash)}
         <div class="table-row">
           <span>{block.height}</span>
+          <span>{block.miner}</span>
           <span>{block.nonce}</span>
           <span>{block.difficulty}</span>
           <span>{(block.blockTimeMs / 1000).toFixed(2)}s</span>
-          <span class="hash">{block.hash}</span>
+          <span class="hash" title={block.hash}>{shortHash(block.hash)}</span>
         </div>
       {/each}
     </div>
@@ -306,13 +428,17 @@
 
   .table-row {
     display: grid;
-    grid-template-columns: 80px 120px 120px 120px 1fr;
+    grid-template-columns: 80px 100px 120px 120px 120px 1fr;
     gap: 0.75rem;
     align-items: start;
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 0.75rem 1rem;
     background: var(--surface);
+  }
+
+  .table-row.workers {
+    grid-template-columns: 120px 140px 1fr;
   }
 
   .table-row.header {
@@ -324,7 +450,8 @@
   }
 
   @media (max-width: 720px) {
-    .table-row {
+    .table-row,
+    .table-row.workers {
       grid-template-columns: 1fr;
     }
   }
