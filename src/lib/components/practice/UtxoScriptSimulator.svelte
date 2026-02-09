@@ -69,6 +69,7 @@
       address: initAddress.trim(),
       amount: Number(initAmount.toFixed(8))
     };
+    recipientAmount = utxo.amount;
     message = 'A new UTXO was created. Enter transfer details next.';
     scriptStatus = 'idle';
     stack = [];
@@ -150,10 +151,11 @@
         label: 'Finalize',
         description: 'Consume the input UTXO and produce the recipient output.',
         action: (nextStack) => {
+          const outputAmount = utxo ? utxo.amount : recipientAmount;
           newUtxo = {
             id: `UTXO-${createRandomHex(8)}`,
             address: recipientAddress.trim(),
-            amount: Number(recipientAmount.toFixed(8))
+            amount: Number(outputAmount.toFixed(8))
           };
           return nextStack;
         }
@@ -166,10 +168,11 @@
       message = 'Create an initial UTXO before starting the script.';
       return;
     }
-    if (!recipientAddress.trim() || recipientAmount <= 0) {
-      message = 'Enter a recipient address and a positive amount.';
+    if (!recipientAddress.trim()) {
+      message = 'Enter a recipient address to continue.';
       return;
     }
+    recipientAmount = utxo.amount;
     signature = generateSignature();
     publicKey = generatePublicKey();
     pubKeyHash = shortHash(publicKey);
@@ -255,7 +258,14 @@
         </label>
         <label>
           Transfer amount (BTC)
-          <input type="number" min="0" step="0.00000001" bind:value={recipientAmount} />
+          <input
+            type="number"
+            min="0"
+            step="0.00000001"
+            value={recipientAmount}
+            disabled
+          />
+          <span class="helper">Locked to the input UTXO amount.</span>
         </label>
       </div>
       <div class="button-row">
@@ -332,18 +342,36 @@
       <div class="script-meta">
         <p class:warning={scriptStatus === 'error'}>{message}</p>
         {#if signature}
-          <div class="meta-grid">
-            <div>
-              <span>Signature</span>
-              <strong>{signature.slice(0, 24)}...</strong>
+          <div class="meta-sections">
+            <div class="meta-card">
+              <h5>UTXO → Script (locking data)</h5>
+              <div class="meta-grid">
+                <div>
+                  <span>PubKey Hash</span>
+                  <strong>{pubKeyHash}</strong>
+                </div>
+                <div>
+                  <span>Input amount</span>
+                  <strong>{utxo ? `${utxo.amount} BTC` : '--'}</strong>
+                </div>
+              </div>
             </div>
-            <div>
-              <span>Public Key</span>
-              <strong>{publicKey.slice(0, 24)}...</strong>
-            </div>
-            <div>
-              <span>PubKey Hash</span>
-              <strong>{pubKeyHash}</strong>
+            <div class="meta-card">
+              <h5>Transaction → Script (user data)</h5>
+              <div class="meta-grid">
+                <div>
+                  <span>Signature</span>
+                  <strong>{signature.slice(0, 24)}...</strong>
+                </div>
+                <div>
+                  <span>Public Key</span>
+                  <strong>{publicKey.slice(0, 24)}...</strong>
+                </div>
+                <div>
+                  <span>Recipient</span>
+                  <strong>{recipientAddress.slice(0, 18)}...</strong>
+                </div>
+              </div>
             </div>
           </div>
         {/if}
@@ -524,6 +552,30 @@
 
   .script-meta p.warning {
     color: #b00020;
+  }
+
+  .helper {
+    font-size: 0.75rem;
+    color: var(--muted-text);
+  }
+
+  .meta-sections {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .meta-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.75rem;
+    background: var(--background);
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .meta-card h5 {
+    margin: 0;
+    font-size: 0.85rem;
   }
 
   .meta-grid {
