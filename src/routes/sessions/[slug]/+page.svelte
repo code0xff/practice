@@ -4,6 +4,7 @@
   import Button from '$components/ui/button/button.svelte';
   import BitcoinPowSimulator from '$lib/components/practice/BitcoinPowSimulator.svelte';
   import UtxoSimulator from '$lib/components/practice/UtxoSimulator.svelte';
+  import UtxoScriptSimulator from '$lib/components/practice/UtxoScriptSimulator.svelte';
   import KeccakHashPractice from '$lib/components/practice/KeccakHashPractice.svelte';
   import MerkleTreePractice from '$lib/components/practice/MerkleTreePractice.svelte';
   import DiffieHellmanChatPractice from '$lib/components/practice/DiffieHellmanChatPractice.svelte';
@@ -87,6 +88,8 @@
     <BitcoinPowSimulator />
   {:else if data.session.slug === 'utxo-simulation'}
     <UtxoSimulator />
+  {:else if data.session.slug === 'utxo-script-machine'}
+    <UtxoScriptSimulator />
   {:else if data.session.slug === 'keccak-hash'}
     <KeccakHashPractice />
   {:else if data.session.slug === 'merkle-tree'}

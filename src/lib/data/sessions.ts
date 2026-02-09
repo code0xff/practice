@@ -69,6 +69,22 @@ export const sessions: PracticeSession[] = [
     ]
   },
   {
+    slug: 'utxo-script-machine',
+    title: 'UTXO stack script walkthrough',
+    summary: 'Step through a Bitcoin script-like stack machine and watch UTXO spending unfold.',
+    difficulty: 'Foundations',
+    goals: [
+      'Connect UTXO spending to scriptSig + scriptPubKey operations',
+      'Understand how stack operations validate signatures',
+      'Track how a successful script produces a new UTXO'
+    ],
+    tasks: [
+      'Create an initial UTXO with a wallet address and balance',
+      'Enter a recipient and start the script execution',
+      'Use Next to observe stack changes at each opcode'
+    ]
+  },
+  {
     slug: 'keccak-hash',
     title: 'Keccak256 hashing playground',
     summary: 'Hash custom inputs with Keccak256 and review recent results.',
