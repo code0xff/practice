@@ -9,6 +9,7 @@
   import MerkleTreePractice from '$lib/components/practice/MerkleTreePractice.svelte';
   import DiffieHellmanChatPractice from '$lib/components/practice/DiffieHellmanChatPractice.svelte';
   import PbftSimulator from '$lib/components/practice/PbftSimulator.svelte';
+  import LegacyTxLab from '$lib/components/practice/LegacyTxLab.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -98,6 +99,8 @@
     <DiffieHellmanChatPractice />
   {:else if data.session.slug === 'pbft-simulation'}
     <PbftSimulator />
+  {:else if data.session.slug === 'legacy-tx-lab'}
+    <LegacyTxLab />
   {/if}
 
   <Card className="" style="margin-top: 1.5rem;">

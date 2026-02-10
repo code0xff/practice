@@ -147,6 +147,25 @@ export const sessions: PracticeSession[] = [
       'Advance to precommit when 2f+1 votes are reached',
       'Trigger a round change when votes fail'
     ]
+  },
+  {
+    slug: 'legacy-tx-lab',
+    title: 'Ethereum legacy transaction lab',
+    summary: 'Assemble a LegacyTx field-by-field, hash it, sign it, and produce raw RLP output.',
+    difficulty: 'Foundations',
+    goals: [
+      'Understand each LegacyTx field and how it is serialized',
+      'Trace how RLP encoding and Keccak hashing produce the transaction hash',
+      'Connect signatures (v, r, s) to the final raw transaction bytes'
+    ],
+    tasks: [
+      'Generate a private key and derive the public key and address',
+      'Populate LegacyTx fields (nonce, gasPrice, gasLimit, to, value, data, chainId)',
+      'RLP-encode the unsigned transaction and compute the keccak256 hash',
+      'Sign the hash and extract v, r, s values',
+      'Insert the signature fields into the transaction',
+      'RLP-encode the signed transaction for eth_sendRawTransaction'
+    ]
   }
 ];
 
