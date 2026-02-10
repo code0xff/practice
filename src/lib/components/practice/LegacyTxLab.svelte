@@ -86,6 +86,14 @@
     return Uint8Array.from(normalized.match(/.{1,2}/g) ?? [], (byte) => Number(`0x${byte}`));
   };
 
+  const toPrivateKeyBytes = (value: string) => {
+    const bytes = fromHex(value);
+    if (bytes.length !== 32) {
+      throw new Error('Private key must be 32 bytes (64 hex chars).');
+    }
+    return bytes;
+  };
+
   const bigintToBytes = (value: bigint) => {
     if (value === 0n) return new Uint8Array();
     let hex = value.toString(16);
@@ -146,7 +154,7 @@
       return;
     }
     try {
-      const pub = getPublicKey(strip0x(privateKey), false);
+      const pub = getPublicKey(toPrivateKeyBytes(privateKey), false);
       publicKey = toHex(pub);
       const pubBytes = pub.slice(1);
       const hash = new Uint8Array(sha3.keccak256.arrayBuffer(pubBytes));
@@ -218,7 +226,7 @@
       return;
     }
     try {
-      const sig = sign(unsignedHashBytes, strip0x(privateKey), {
+      const sig = sign(unsignedHashBytes, toPrivateKeyBytes(privateKey), {
         prehash: false,
         format: 'recovered'
       });
