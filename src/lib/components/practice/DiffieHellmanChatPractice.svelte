@@ -66,8 +66,9 @@
   const generateKeys = (party: Party) => {
     try {
       party.error = '';
-      const priv = toHex(utils.randomSecretKey());
-      const pub = toHex(getPublicKey(priv, true));
+      const privBytes = utils.randomSecretKey();
+      const priv = toHex(privBytes);
+      const pub = toHex(getPublicKey(privBytes, true));
       party.privateKey = priv;
       party.publicKey = pub;
       party.sharedSecret = '';
@@ -85,7 +86,7 @@
         party.error = 'Enter a private key first.';
         return;
       }
-      party.publicKey = toHex(getPublicKey(party.privateKey, true));
+      party.publicKey = toHex(getPublicKey(fromHex(party.privateKey), true));
       party.sharedSecret = '';
       party.encrypted = '';
       party.decrypted = '';

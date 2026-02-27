@@ -10,6 +10,7 @@
   import DiffieHellmanChatPractice from '$lib/components/practice/DiffieHellmanChatPractice.svelte';
   import PbftSimulator from '$lib/components/practice/PbftSimulator.svelte';
   import LegacyTxLab from '$lib/components/practice/LegacyTxLab.svelte';
+  import AddressDerivationLab from '$lib/components/practice/AddressDerivationLab.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -101,6 +102,8 @@
     <PbftSimulator />
   {:else if data.session.slug === 'legacy-tx-lab'}
     <LegacyTxLab />
+  {:else if data.session.slug === 'address-derivation-lab'}
+    <AddressDerivationLab />
   {/if}
 
   <Card className="" style="margin-top: 1.5rem;">

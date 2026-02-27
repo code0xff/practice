@@ -166,6 +166,24 @@ export const sessions: PracticeSession[] = [
       'Insert the signature fields into the transaction',
       'RLP-encode the signed transaction for eth_sendRawTransaction'
     ]
+  },
+  {
+    slug: 'address-derivation-lab',
+    title: 'Address derivation lab (BTC + ETH + Cosmos)',
+    summary:
+      'Derive Bitcoin, Ethereum, and Cosmos addresses step-by-step from the same private key.',
+    difficulty: 'Intermediate',
+    goals: [
+      'Connect private key material to public keys on secp256k1',
+      'Understand Ethereum address derivation and EIP-55 checksums',
+      'Compare Bitcoin and Cosmos address derivation using HASH160 and different encodings'
+    ],
+    tasks: [
+      'Generate or input a private key and choose Bitcoin, Ethereum, or Cosmos',
+      'Run each derivation step and inspect intermediate values',
+      'For Bitcoin, compare P2PKH, P2SH-P2WPKH, and P2WPKH outputs',
+      'For Cosmos, derive HASH160(pubkey) and encode to a bech32 cosmos address'
+    ]
   }
 ];
 

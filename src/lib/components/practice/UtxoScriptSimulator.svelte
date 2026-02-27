@@ -34,6 +34,9 @@
     return hash.toString(16).padStart(8, '0');
   };
 
+  const isErrorStatus = (status: 'idle' | 'running' | 'complete' | 'error') =>
+    status === 'error';
+
   let initAddress = '';
   let initAmount = 1;
   let utxo: Utxo | null = null;
@@ -194,7 +197,7 @@
     const step = scriptSteps[nextIndex];
     stack = step.action([...stack]);
     currentStepIndex = nextIndex;
-    if (scriptStatus === 'error') {
+    if (isErrorStatus(scriptStatus)) {
       return;
     }
     if (nextIndex === scriptSteps.length - 1) {
