@@ -2,27 +2,44 @@
   import Card from '$components/ui/card/card.svelte';
   import Button from '$components/ui/button/button.svelte';
   import { sessions } from '$lib/data/sessions';
+
+  const totalSessions = sessions.length;
+  const difficultyGroups = new Set(sessions.map((session) => session.difficulty)).size;
 </script>
 
-<section class="section-title">
-  <span class="badge">Front-end only</span>
-  <h1>A blockchain practice workspace</h1>
+<section class="hero">
+  <div class="hero-copy">
+    <span class="badge">Local-first frontend lab</span>
+    <h1>Blockchain concepts, practiced through interactive sessions</h1>
+    <p class="subtle">
+      Each lab is stateful in your browser, so you can resume experiments instantly while we keep
+      the stack simple and fast.
+    </p>
+  </div>
+  <div class="hero-meta">
+    <div class="hero-stat">
+      <strong>{totalSessions}</strong>
+      <span class="subtle">Hands-on sessions</span>
+    </div>
+    <div class="hero-stat">
+      <strong>{difficultyGroups}</strong>
+      <span class="subtle">Difficulty tiers from beginner to intermediate</span>
+    </div>
+  </div>
 </section>
 
-<p class="subtle">
-  Progress is saved locally in your browser, and each session gets its own page for
-  managing scenarios and notes. The design leaves room to expand into IndexedDB
-  storage later if needed.
-</p>
-
-<div class="grid" style="margin-top: 2rem;">
+<section class="section-title">
+  <span class="badge warm">Session library</span>
+  <h2>Choose your next lab</h2>
+</section>
+<div class="grid">
   {#each sessions as session}
-    <Card>
+    <Card className="session-card">
       <div class="badge">{session.difficulty}</div>
       <h3>{session.title}</h3>
       <p class="subtle">{session.summary}</p>
       <a href={`/sessions/${session.slug}`}>
-        <Button>Open session</Button>
+        <Button>Start lab</Button>
       </a>
     </Card>
   {/each}

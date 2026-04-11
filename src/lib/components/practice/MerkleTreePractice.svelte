@@ -32,10 +32,31 @@
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('');
 
+  const fromHex = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return new Uint8Array();
+    if (!/^[0-9a-f]+$/.test(normalized) || normalized.length % 2 !== 0) {
+      throw new Error('Invalid hex value.');
+    }
+    return Uint8Array.from(normalized.match(/.{1,2}/g) ?? [], (byte) => Number(`0x${byte}`));
+  };
+
+  const concatBytes = (left: Uint8Array, right: Uint8Array) => {
+    const out = new Uint8Array(left.length + right.length);
+    out.set(left, 0);
+    out.set(right, left.length);
+    return out;
+  };
+
   const sha256Hex = async (value: string) => {
     const encoded = new TextEncoder().encode(value);
     const digest = await crypto.subtle.digest('SHA-256', encoded);
     return toHex(digest);
+  };
+
+  const sha256Bytes = async (value: Uint8Array) => {
+    const digest = await crypto.subtle.digest('SHA-256', value as unknown as BufferSource);
+    return new Uint8Array(digest);
   };
 
   const recomputeLeaves = () => {
@@ -49,6 +70,9 @@
         }
       }
       leaves = next;
+      if (selectedLeafIndex >= totalLeaves) {
+        selectedLeafIndex = totalLeaves - 1;
+      }
     }
   };
 
@@ -65,8 +89,8 @@
       for (let i = 0; i < current.length; i += 2) {
         const left = current[i];
         const right = current[i + 1];
-        const combined = await sha256Hex(`${left}${right}`);
-        nextLevel.push(combined);
+        const combined = await sha256Bytes(concatBytes(fromHex(left), fromHex(right)));
+        nextLevel.push(toHex(combined.buffer));
       }
       levels.push(nextLevel);
     }
@@ -112,18 +136,25 @@
   };
 
   const verifyProof = async () => {
-    if (!rootInput) {
+    const normalizedRoot = rootInput.trim().toLowerCase();
+    if (!normalizedRoot) {
       proofValid = false;
       return;
     }
-    let currentHash = leafHashes[selectedLeafIndex];
-    for (const step of proof) {
-      currentHash =
-        step.position === 'left'
-          ? await sha256Hex(`${step.hash}${currentHash}`)
-          : await sha256Hex(`${currentHash}${step.hash}`);
+    try {
+      let currentHash = fromHex(leafHashes[selectedLeafIndex]);
+      for (const step of proof) {
+        const sibling = fromHex(step.hash);
+        const combined =
+          step.position === 'left'
+            ? concatBytes(sibling, currentHash)
+            : concatBytes(currentHash, sibling);
+        currentHash = await sha256Bytes(combined);
+      }
+      proofValid = toHex(currentHash.buffer) === normalizedRoot;
+    } catch {
+      proofValid = false;
     }
-    proofValid = currentHash === rootInput;
   };
 
   const resetLeaves = () => {

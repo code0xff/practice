@@ -51,15 +51,10 @@
     return Uint8Array.from(normalized.match(/.{1,2}/g) ?? [], (byte) => Number(`0x${byte}`));
   };
 
-  const sha256Hex = async (value: string) => {
-    const encoded = new TextEncoder().encode(value);
-    const digest = await crypto.subtle.digest('SHA-256', encoded);
-    return toHex(digest);
-  };
-
   const deriveAesKey = async (sharedSecret: string) => {
-    const hashed = await sha256Hex(sharedSecret);
-    const keyData = Uint8Array.from(hashed.match(/.{1,2}/g) ?? [], (byte) => Number(`0x${byte}`));
+    const sharedSecretBytes = fromHex(sharedSecret);
+    const digest = await crypto.subtle.digest('SHA-256', sharedSecretBytes);
+    const keyData = new Uint8Array(digest);
     return crypto.subtle.importKey('raw', keyData, 'AES-GCM', false, ['encrypt', 'decrypt']);
   };
 
@@ -107,7 +102,8 @@
         fromHex(party.partnerPublicKey),
         true
       );
-      party.sharedSecret = toHex(secret);
+      // Compressed ECDH output is 33 bytes; use x-coordinate (32 bytes) as shared secret material.
+      party.sharedSecret = toHex(secret.slice(1));
       ceremonyStep = 'Shared secret derived. You can now encrypt and decrypt messages.';
     } catch (error) {
       party.error = error instanceof Error ? error.message : 'Unable to derive shared secret.';
@@ -115,41 +111,54 @@
   };
 
   const encryptMessage = async (sender: Party) => {
-    sender.error = '';
-    if (!sender.sharedSecret) {
-      sender.error = 'Derive the shared secret first.';
-      return;
+    try {
+      sender.error = '';
+      if (!sender.sharedSecret) {
+        sender.error = 'Derive the shared secret first.';
+        return;
+      }
+      if (!sender.message.trim()) {
+        sender.error = 'Enter a message to encrypt.';
+        return;
+      }
+      const key = await deriveAesKey(sender.sharedSecret);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encoded = new TextEncoder().encode(sender.message);
+      const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+      const combined = new Uint8Array(iv.byteLength + cipher.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(cipher), iv.byteLength);
+      sender.encrypted = btoa(String.fromCharCode(...combined));
+    } catch (error) {
+      sender.error = error instanceof Error ? error.message : 'Encryption failed.';
     }
-    if (!sender.message.trim()) {
-      sender.error = 'Enter a message to encrypt.';
-      return;
-    }
-    const key = await deriveAesKey(sender.sharedSecret);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encoded = new TextEncoder().encode(sender.message);
-    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-    const combined = new Uint8Array(iv.byteLength + cipher.byteLength);
-    combined.set(iv, 0);
-    combined.set(new Uint8Array(cipher), iv.byteLength);
-    sender.encrypted = btoa(String.fromCharCode(...combined));
   };
 
   const decryptMessage = async (receiver: Party, payload: string) => {
-    receiver.error = '';
-    if (!receiver.sharedSecret) {
-      receiver.error = 'Derive the shared secret first.';
-      return;
+    try {
+      receiver.error = '';
+      if (!receiver.sharedSecret) {
+        receiver.error = 'Derive the shared secret first.';
+        return;
+      }
+      if (!payload) {
+        receiver.error = 'No encrypted payload to decrypt.';
+        return;
+      }
+      const data = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
+      if (data.length < 13) {
+        receiver.error = 'Encrypted payload is too short.';
+        return;
+      }
+      const iv = data.slice(0, 12);
+      const cipher = data.slice(12);
+      const key = await deriveAesKey(receiver.sharedSecret);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+      receiver.decrypted = new TextDecoder().decode(plain);
+    } catch (error) {
+      receiver.error = error instanceof Error ? error.message : 'Decryption failed.';
+      receiver.decrypted = '';
     }
-    if (!payload) {
-      receiver.error = 'No encrypted payload to decrypt.';
-      return;
-    }
-    const data = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
-    const iv = data.slice(0, 12);
-    const cipher = data.slice(12);
-    const key = await deriveAesKey(receiver.sharedSecret);
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
-    receiver.decrypted = new TextDecoder().decode(plain);
   };
 
   const syncPublicKeys = () => {

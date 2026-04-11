@@ -49,13 +49,21 @@
     </a>
   </Card>
 {:else}
-  <section class="section-title">
-    <div>
+  <section class="hero session-hero">
+    <div class="hero-copy">
       <span class="badge">{data.session.difficulty}</span>
-    </div>
-    <div>
       <h2>{data.session.title}</h2>
       <p class="subtle">{data.session.summary}</p>
+    </div>
+    <div class="hero-meta">
+      <div class="hero-stat">
+        <strong>{data.session.goals.length}</strong>
+        <span class="subtle">Learning goals</span>
+      </div>
+      <div class="hero-stat">
+        <strong>{data.session.tasks.length}</strong>
+        <span class="subtle">Practice tasks</span>
+      </div>
     </div>
   </section>
 
@@ -106,11 +114,11 @@
     <AddressDerivationLab />
   {/if}
 
-  <Card className="" style="margin-top: 1.5rem;">
+  <Card className="notes-card">
     <h3>Session notes</h3>
     <p class="subtle">Capture ideas or questions that come up during the exercise.</p>
     <textarea bind:value={notes} placeholder="Write your notes here"></textarea>
-    <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+    <div class="notes-actions">
       <Button on:click={handleSave}>Save notes</Button>
       <Button variant="secondary" on:click={toggleComplete}>
         {completed ? 'Mark as in progress' : 'Mark as completed'}

@@ -25,6 +25,16 @@
   let selectedInputs = new Set<string>();
   let errorMessage = '';
   let lastFee = 0;
+  const SATOSHIS_PER_BTC = 100_000_000n;
+
+  const normalizeAmount = (value: number) => Number(value.toFixed(8));
+
+  const toSats = (value: number) => {
+    const scaled = Math.round(Number(value.toFixed(8)) * Number(SATOSHIS_PER_BTC));
+    return BigInt(scaled);
+  };
+
+  const fromSats = (value: bigint) => Number(value) / Number(SATOSHIS_PER_BTC);
 
   const generateRandomAddress = () => {
     const bytes = new Uint8Array(10);
@@ -58,14 +68,14 @@
       errorMessage = 'Enter an address before initializing.';
       return;
     }
-    if (initAmount <= 0) {
+    if (!Number.isFinite(initAmount) || initAmount <= 0) {
       errorMessage = 'Initial amount must be greater than zero.';
       return;
     }
     const newUtxo: Utxo = {
       id: crypto.randomUUID(),
       address: initAddress.trim(),
-      amount: Number(initAmount.toFixed(8))
+      amount: normalizeAmount(initAmount)
     };
     utxos = [...utxos, newUtxo];
     saveState(utxos, transactions);
@@ -91,15 +101,16 @@
       return;
     }
     const invalidRecipient = recipients.find(
-      (recipient) => !recipient.address.trim() || recipient.amount <= 0
+      (recipient) =>
+        !recipient.address.trim() || !Number.isFinite(recipient.amount) || recipient.amount <= 0
     );
     if (invalidRecipient) {
       errorMessage = 'Each recipient needs an address and a positive amount.';
       return;
     }
     const inputs = utxos.filter((utxo) => selectedInputs.has(utxo.id));
-    const totalInput = inputs.reduce((sum, utxo) => sum + utxo.amount, 0);
-    const totalOutput = recipients.reduce((sum, recipient) => sum + recipient.amount, 0);
+    const totalInput = inputs.reduce((sum, utxo) => sum + toSats(utxo.amount), 0n);
+    const totalOutput = recipients.reduce((sum, recipient) => sum + toSats(recipient.amount), 0n);
     if (totalInput < totalOutput) {
       errorMessage = 'Selected inputs do not cover the recipient totals.';
       return;
@@ -110,11 +121,10 @@
       outputs.push({
         id: crypto.randomUUID(),
         address: recipient.address.trim(),
-        amount: Number(recipient.amount.toFixed(8))
+        amount: normalizeAmount(recipient.amount)
       });
     });
-    const fee = Number((totalInput - totalOutput).toFixed(8));
-    lastFee = fee;
+    lastFee = normalizeAmount(fromSats(totalInput - totalOutput));
 
     const nextUtxos = utxos.filter((utxo) => !selectedInputs.has(utxo.id)).concat(outputs);
     const tx: TxRecord = {

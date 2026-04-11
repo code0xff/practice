@@ -18,6 +18,7 @@
   };
 
   const STORAGE_KEY = 'chainlab-pow-blocks';
+  const DIFFICULTY_KEY = 'chainlab-pow-difficulty';
   const DEFAULT_TARGET_BLOCK_TIME = 10;
   const DEFAULT_DIFFICULTY = 3;
   const MAX_DIFFICULTY = 10;
@@ -40,6 +41,10 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBlocks));
   };
 
+  const saveDifficulty = (nextDifficulty: number) => {
+    localStorage.setItem(DIFFICULTY_KEY, String(nextDifficulty));
+  };
+
   const loadBlocks = (): PowBlock[] => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -47,6 +52,14 @@
     } catch {
       return [];
     }
+  };
+
+  const loadDifficulty = () => {
+    const stored = localStorage.getItem(DIFFICULTY_KEY);
+    if (!stored) return null;
+    const parsed = Number(stored);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(MAX_DIFFICULTY, Math.max(MIN_DIFFICULTY, Math.floor(parsed)));
   };
 
   const shortHash = (value: string) => {
@@ -62,6 +75,7 @@
     } else if (blockTimeMs > targetMs * 1.2) {
       difficulty = Math.max(MIN_DIFFICULTY, difficulty - 1);
     }
+    saveDifficulty(difficulty);
   };
 
   const createMiningWorker = () => {
@@ -258,16 +272,25 @@
     blocks = [];
     latestHashPreview = '';
     difficulty = DEFAULT_DIFFICULTY;
+    saveDifficulty(difficulty);
     lastBlockTimestamp = Date.now();
     workerStats = [];
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DIFFICULTY_KEY);
   };
 
   onMount(() => {
     blocks = loadBlocks();
-    if (blocks.length) {
+    const savedDifficulty = loadDifficulty();
+    if (savedDifficulty !== null) {
+      difficulty = savedDifficulty;
+    } else if (blocks.length) {
       lastBlockTimestamp = blocks[blocks.length - 1].timestamp;
       difficulty = blocks[blocks.length - 1].difficulty;
+      saveDifficulty(difficulty);
+    }
+    if (blocks.length) {
+      lastBlockTimestamp = blocks[blocks.length - 1].timestamp;
     }
   });
 
