@@ -10,8 +10,9 @@
   type TxRecord = {
     id: string;
     inputs: Utxo[];
-    outputs: Utxo[];
+    outputs: (Utxo & { purpose: 'recipient' | 'change' })[];
     timestamp: number;
+    fee: number;
   };
 
   const STORAGE_KEY = 'chainlab-utxo-ledger';
@@ -25,6 +26,8 @@
   let selectedInputs = new Set<string>();
   let errorMessage = '';
   let lastFee = 0;
+  let feeAmount = 0.0001;
+  let changeAddress = '';
   const SATOSHIS_PER_BTC = 100_000_000n;
 
   const normalizeAmount = (value: number) => Number(value.toFixed(8));
@@ -111,27 +114,48 @@
     const inputs = utxos.filter((utxo) => selectedInputs.has(utxo.id));
     const totalInput = inputs.reduce((sum, utxo) => sum + toSats(utxo.amount), 0n);
     const totalOutput = recipients.reduce((sum, recipient) => sum + toSats(recipient.amount), 0n);
-    if (totalInput < totalOutput) {
-      errorMessage = 'Selected inputs do not cover the recipient totals.';
+    const fee = toSats(feeAmount);
+    if (fee < 0n) {
+      errorMessage = 'Fee must be zero or greater.';
+      return;
+    }
+    if (!changeAddress.trim()) {
+      errorMessage = 'Enter a change address before sending.';
+      return;
+    }
+    const totalRequired = totalOutput + fee;
+    if (totalInput < totalRequired) {
+      errorMessage = 'Selected inputs do not cover the recipient totals plus fee.';
       return;
     }
 
-    const outputs: Utxo[] = [];
+    const outputs: (Utxo & { purpose: 'recipient' | 'change' })[] = [];
     recipients.forEach((recipient) => {
       outputs.push({
         id: crypto.randomUUID(),
         address: recipient.address.trim(),
-        amount: normalizeAmount(recipient.amount)
+        amount: normalizeAmount(recipient.amount),
+        purpose: 'recipient'
       });
     });
-    lastFee = normalizeAmount(fromSats(totalInput - totalOutput));
+    const change = totalInput - totalRequired;
+    if (change > 0n) {
+      outputs.push({
+        id: crypto.randomUUID(),
+        address: changeAddress.trim(),
+        amount: normalizeAmount(fromSats(change)),
+        purpose: 'change'
+      });
+    }
+    lastFee = normalizeAmount(fromSats(fee));
 
     const nextUtxos = utxos.filter((utxo) => !selectedInputs.has(utxo.id)).concat(outputs);
     const tx: TxRecord = {
       id: crypto.randomUUID(),
       inputs,
       outputs,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      fee: normalizeAmount(fromSats(fee))
     };
     utxos = nextUtxos;
     transactions = [tx, ...transactions].slice(0, 5);
@@ -179,9 +203,11 @@
     transactions = [];
     selectedInputs = new Set();
     initAddress = '';
+    changeAddress = '';
     recipients = [{ id: crypto.randomUUID(), address: '', amount: 0 }];
     errorMessage = '';
     lastFee = 0;
+    feeAmount = 0.0001;
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TX_KEY);
   };
@@ -189,6 +215,7 @@
   onMount(() => {
     loadState();
     initAddress = generateRandomAddress();
+    changeAddress = initAddress;
     recipients = [
       { id: crypto.randomUUID(), address: generateRandomAddress(), amount: 0.5 }
     ];
@@ -295,8 +322,18 @@
       Send
     </button>
   </div>
+  <div class="form-grid">
+    <label>
+      Fee (BTC)
+      <input type="number" min="0" step="0.00000001" bind:value={feeAmount} />
+    </label>
+    <label>
+      Change address
+      <input type="text" bind:value={changeAddress} placeholder="bc1q..." />
+    </label>
+  </div>
   <p class="subtle">
-    Total input minus total recipient amounts is treated as a fee. Current fee: {lastFee} BTC
+    Unspent value returns to the change address. Current fee: {lastFee} BTC
   </p>
   {#if errorMessage}
     <p class="error">{errorMessage}</p>
@@ -324,10 +361,13 @@
           <h4>Outputs</h4>
           {#each tx.outputs as output}
             <div class="pill">
-              <span class="hash">{output.address}</span>
+              <span class="hash">
+                {output.purpose === 'change' ? `Change → ${output.address}` : output.address}
+              </span>
               <strong>{output.amount} BTC</strong>
             </div>
           {/each}
+          <p class="subtle">Fee: {tx.fee} BTC</p>
         </div>
       </div>
     {/each}

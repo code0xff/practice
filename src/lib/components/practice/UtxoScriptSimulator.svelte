@@ -6,6 +6,15 @@
     id: string;
     address: string;
     amount: number;
+    ownerPrivateKey: string;
+    ownerPublicKey: string;
+    ownerPubKeyHash: string;
+  };
+
+  type SpendResultUtxo = {
+    id: string;
+    address: string;
+    amount: number;
   };
 
   type ScriptStep = {
@@ -181,14 +190,14 @@
   let recipientAddress = '';
   let recipientAmount = 0.5;
   let signature = '';
-  let publicKey = '';
-  let pubKeyHash = '';
+  let unlockingPublicKey = '';
+  let lockingPubKeyHash = '';
   let stack: string[] = [];
   let scriptSteps: ScriptStep[] = [];
   let currentStepIndex = -1;
   let scriptStatus: 'idle' | 'running' | 'complete' | 'error' = 'idle';
   let message = '';
-  let newUtxo: Utxo | null = null;
+  let newUtxo: SpendResultUtxo | null = null;
   let signingPrivateKey = '';
   let signingMessageHash = '';
 
@@ -202,22 +211,32 @@
     return item;
   };
 
-  const initializeUtxo = () => {
+  const initializeUtxo = async () => {
     if (!initAddress.trim() || initAmount <= 0) {
       message = 'Enter a wallet address and an initial amount to create the UTXO.';
       return;
     }
-    utxo = {
-      id: `UTXO-${createRandomHex(8)}`,
-      address: initAddress.trim(),
-      amount: Number(initAmount.toFixed(8))
-    };
-    recipientAmount = utxo.amount;
-    message = 'A new UTXO was created. Enter transfer details next.';
-    scriptStatus = 'idle';
-    stack = [];
-    currentStepIndex = -1;
-    newUtxo = null;
+    try {
+      const ownerPrivateKey = toHex(utils.randomSecretKey());
+      const ownerPublicKey = toHex(getPublicKey(fromHex(ownerPrivateKey), true));
+      const ownerPubKeyHash = await hash160Hex(fromHex(ownerPublicKey));
+      utxo = {
+        id: `UTXO-${createRandomHex(8)}`,
+        address: initAddress.trim(),
+        amount: Number(initAmount.toFixed(8)),
+        ownerPrivateKey,
+        ownerPublicKey,
+        ownerPubKeyHash
+      };
+      recipientAmount = Number(initAmount.toFixed(8));
+      message = 'A new UTXO was created with a locking pubkey hash. Enter transfer details next.';
+      scriptStatus = 'idle';
+      stack = [];
+      currentStepIndex = -1;
+      newUtxo = null;
+    } catch (error) {
+      message = error instanceof Error ? error.message : 'Failed to create owner key material.';
+    }
   };
 
   const buildSteps = () => {
@@ -234,7 +253,7 @@
         id: 'push-pubkey',
         label: 'Push Public Key',
         description: 'Push the public key from scriptSig onto the stack.',
-        action: (nextStack) => [...nextStack, `PUBKEY:${publicKey}`]
+        action: (nextStack) => [...nextStack, `PUBKEY:${unlockingPublicKey}`]
       },
       {
         id: 'op-dup',
@@ -261,7 +280,7 @@
         id: 'push-hash',
         label: 'Push PubKeyHash',
         description: 'Push the expected pubkey hash from the locking script.',
-        action: (nextStack) => [...nextStack, `LOCK_HASH(${pubKeyHash})`]
+        action: (nextStack) => [...nextStack, `LOCK_HASH(${lockingPubKeyHash})`]
       },
       {
         id: 'op-equalverify',
@@ -339,9 +358,10 @@
     }
     try {
       recipientAmount = utxo.amount;
-      signingPrivateKey = toHex(utils.randomSecretKey());
-      publicKey = toHex(getPublicKey(fromHex(signingPrivateKey), true));
-      pubKeyHash = await hash160Hex(fromHex(publicKey));
+      recipientAmount = utxo.amount;
+      signingPrivateKey = utxo.ownerPrivateKey;
+      unlockingPublicKey = utxo.ownerPublicKey;
+      lockingPubKeyHash = utxo.ownerPubKeyHash;
 
       const msgSeed = new TextEncoder().encode(
         `${utxo.id}|${utxo.address}|${recipientAddress.trim()}|${recipientAmount}`
@@ -528,7 +548,7 @@
               <div class="meta-grid">
                 <div>
                   <span>PubKey Hash</span>
-                  <strong>{pubKeyHash}</strong>
+                  <strong>{lockingPubKeyHash}</strong>
                 </div>
                 <div>
                   <span>Input amount</span>
@@ -545,7 +565,7 @@
                 </div>
                 <div>
                   <span>Public Key</span>
-                  <strong>{publicKey.slice(0, 24)}...</strong>
+                  <strong>{unlockingPublicKey.slice(0, 24)}...</strong>
                 </div>
                 <div>
                   <span>Recipient</span>

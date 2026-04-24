@@ -8,6 +8,8 @@
     role: string;
     prevote: Vote;
     precommit: Vote;
+    lockedRound: number | null;
+    lockedValue: string | null;
   };
 
   const NODE_IDS = ['A', 'B', 'C', 'D'];
@@ -25,8 +27,11 @@
     id,
     role: index === 0 ? 'Proposer' : 'Validator',
     prevote: null,
-    precommit: null
+    precommit: null,
+    lockedRound: null,
+    lockedValue: null
   }));
+  let roundChangeReason = '';
 
   const shortHash = (value: string) => {
     if (!value) return '—';
@@ -75,8 +80,14 @@
   };
 
   const proposeBlock = () => {
-    message = randomMessage();
+    const highestLock = nodes
+      .filter((node) => node.lockedValue)
+      .sort((left, right) => (right.lockedRound ?? 0) - (left.lockedRound ?? 0))[0];
+    message = highestLock?.lockedValue ?? randomMessage();
     phase = 'prevote';
+    roundChangeReason = highestLock
+      ? `Round ${highestLock.lockedRound} lock carried forward into the next proposal.`
+      : '';
     resetVotes();
     startTimer();
   };
@@ -105,10 +116,14 @@
     if (phase !== 'prevote') return;
     const { yes, no, pending } = tallyVotes('prevote');
     if (yes >= QUORUM) {
+      nodes = nodes.map((node) =>
+        node.prevote === 'Yes' ? { ...node, lockedRound: round, lockedValue: message } : node
+      );
       phase = 'precommit';
       startTimer();
-    } else if (no >= 1 && pending === 0) {
-      triggerRoundChange();
+      roundChangeReason = '';
+    } else if ((no >= QUORUM || pending === 0) && yes < QUORUM) {
+      triggerRoundChange('Prevote quorum failed.');
     }
   };
 
@@ -121,15 +136,19 @@
         { height: committed.length + 1, round, proposer: NODE_IDS[proposerIndex], message },
         ...committed
       ];
+      nodes = nodes.map((node) =>
+        node.precommit === 'Yes' ? { ...node, lockedRound: round, lockedValue: message } : node
+      );
       stopTimer();
       newRound();
-    } else if (no >= 1 && pending === 0) {
-      triggerRoundChange();
+    } else if ((no >= QUORUM || pending === 0) && yes < QUORUM) {
+      triggerRoundChange('Precommit quorum failed.');
     }
   };
 
-  const triggerRoundChange = () => {
+  const triggerRoundChange = (reason = 'Timeout reached before quorum.') => {
     phase = 'round-change';
+    roundChangeReason = reason;
     stopTimer();
     nextRound();
   };
@@ -142,6 +161,7 @@
     message = '';
     phase = 'propose';
     countdown = PHASE_SECONDS;
+    roundChangeReason = '';
   }
 
   const nextRound = () => {
@@ -164,6 +184,8 @@
     phase = 'propose';
     stopTimer();
     countdown = PHASE_SECONDS;
+    roundChangeReason = '';
+    nodes = nodes.map((node) => ({ ...node, lockedRound: null, lockedValue: null }));
   };
 
   const nextProposer = (): number => {
@@ -197,6 +219,10 @@
     <div class="status-item">
       <span class="label">Time remaining</span>
       <span>{phase === 'prevote' || phase === 'precommit' ? `${countdown}s` : '—'}</span>
+    </div>
+    <div class="status-item">
+      <span class="label">Round change reason</span>
+      <span>{roundChangeReason || '—'}</span>
     </div>
   </div>
   <div class="button-row">
@@ -270,6 +296,16 @@
       {:else}
         <p class="subtle">Votes open during prevote or precommit.</p>
       {/if}
+      <div class="lock-box">
+        <span class="label">Lock</span>
+        <span class="hash">
+          {#if node.lockedValue}
+            Round {node.lockedRound}: {shortHash(node.lockedValue)}
+          {:else}
+            —
+          {/if}
+        </span>
+      </div>
     </div>
   {/each}
 </section>
@@ -435,6 +471,15 @@
   .commit-list {
     display: grid;
     gap: 0.75rem;
+  }
+
+  .lock-box {
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 0.65rem;
+    background: var(--background);
+    display: grid;
+    gap: 0.35rem;
   }
 
   .commit-row {

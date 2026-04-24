@@ -11,6 +11,8 @@
   import PbftSimulator from '$lib/components/practice/PbftSimulator.svelte';
   import LegacyTxLab from '$lib/components/practice/LegacyTxLab.svelte';
   import AddressDerivationLab from '$lib/components/practice/AddressDerivationLab.svelte';
+  import SmartContractDeploymentLab from '$lib/components/practice/SmartContractDeploymentLab.svelte';
+  import DefiFlowLab from '$lib/components/practice/DefiFlowLab.svelte';
   import { loadProgress, updateProgress } from '$lib/stores/practice';
   import type { PracticeSession } from '$lib/data/sessions';
 
@@ -96,6 +98,10 @@
 
   {#if data.session.slug === 'intro-wallet'}
     <BitcoinPowSimulator />
+  {:else if data.session.slug === 'smart-contract'}
+    <SmartContractDeploymentLab />
+  {:else if data.session.slug === 'defi-flow'}
+    <DefiFlowLab />
   {:else if data.session.slug === 'utxo-simulation'}
     <UtxoSimulator />
   {:else if data.session.slug === 'utxo-script-machine'}
