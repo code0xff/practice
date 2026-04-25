@@ -28,6 +28,14 @@
   let lastFee = 0;
   let feeAmount = 0.0001;
   let changeAddress = '';
+  let minerAddress = '';
+  let selectedUtxos: Utxo[] = [];
+  let previewRecipients: { id: string; address: string; amount: number }[] = [];
+  let previewTotalInput = 0n;
+  let previewRecipientTotal = 0n;
+  let previewFee = 0n;
+  let previewChange = 0n;
+  let previewHasShortfall = false;
   const SATOSHIS_PER_BTC = 100_000_000n;
 
   const normalizeAmount = (value: number) => Number(value.toFixed(8));
@@ -38,6 +46,20 @@
   };
 
   const fromSats = (value: bigint) => Number(value) / Number(SATOSHIS_PER_BTC);
+
+  const safeToSats = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return 0n;
+    return toSats(value);
+  };
+
+  const formatBtc = (value: bigint) => `${normalizeAmount(fromSats(value))} BTC`;
+
+  const shortAddress = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'empty address';
+    if (trimmed.length <= 18) return trimmed;
+    return `${trimmed.slice(0, 10)}…${trimmed.slice(-6)}`;
+  };
 
   const generateRandomAddress = () => {
     const bytes = new Uint8Array(10);
@@ -204,6 +226,7 @@
     selectedInputs = new Set();
     initAddress = '';
     changeAddress = '';
+    minerAddress = '';
     recipients = [{ id: crypto.randomUUID(), address: '', amount: 0 }];
     errorMessage = '';
     lastFee = 0;
@@ -216,10 +239,27 @@
     loadState();
     initAddress = generateRandomAddress();
     changeAddress = initAddress;
+    minerAddress = generateRandomAddress();
     recipients = [
       { id: crypto.randomUUID(), address: generateRandomAddress(), amount: 0.5 }
     ];
   });
+
+  $: selectedUtxos = utxos.filter((utxo) => selectedInputs.has(utxo.id));
+  $: previewRecipients = recipients.filter(
+    (recipient) => recipient.address.trim() || safeToSats(recipient.amount) > 0n
+  );
+  $: previewTotalInput = selectedUtxos.reduce((sum, utxo) => sum + safeToSats(utxo.amount), 0n);
+  $: previewRecipientTotal = previewRecipients.reduce(
+    (sum, recipient) => sum + safeToSats(recipient.amount),
+    0n
+  );
+  $: previewFee = safeToSats(feeAmount);
+  $: previewChange =
+    previewTotalInput > previewRecipientTotal + previewFee
+      ? previewTotalInput - previewRecipientTotal - previewFee
+      : 0n;
+  $: previewHasShortfall = previewTotalInput < previewRecipientTotal + previewFee;
 </script>
 
 <section class="utxo-card">
@@ -331,12 +371,98 @@
       Change address
       <input type="text" bind:value={changeAddress} placeholder="bc1q..." />
     </label>
+    <label>
+      Simulated miner reward address
+      <input type="text" bind:value={minerAddress} placeholder="bc1q..." />
+    </label>
+    <div class="button-row">
+      <button class="secondary" on:click={() => (minerAddress = generateRandomAddress())}>
+        Random miner address
+      </button>
+    </div>
   </div>
   <p class="subtle">
-    Unspent value returns to the change address. Current fee: {lastFee} BTC
+    Unspent value returns to the change address. Fee is collected by the block producer in a
+    coinbase reward, not as a normal transaction output. Current fee: {lastFee} BTC
   </p>
   {#if errorMessage}
     <p class="error">{errorMessage}</p>
+  {/if}
+</section>
+
+<section class="utxo-card">
+  <div>
+    <h3>UTXO flow preview</h3>
+    <p class="subtle">
+      The diagram turns your current form into the transaction shape: selected UTXOs are consumed,
+      recipient and change outputs are created, and the fee is not a new UTXO.
+    </p>
+  </div>
+
+  <div class="flow-diagram" class:shortfall={previewHasShortfall}>
+    <div class="flow-lane">
+      <h4>Selected inputs</h4>
+      {#if selectedUtxos.length === 0}
+        <div class="empty-node">Choose one or more UTXOs above.</div>
+      {:else}
+        {#each selectedUtxos as utxo}
+          <div class="flow-node input-node">
+            <span class="node-kicker">UTXO</span>
+            <strong>{utxo.amount} BTC</strong>
+            <span class="hash">{shortAddress(utxo.address)}</span>
+          </div>
+        {/each}
+      {/if}
+    </div>
+
+    <div class="flow-center" aria-hidden="true">
+      <div class="join-lines"></div>
+      <div class="tx-node">
+        <span>Transaction</span>
+        <strong>{formatBtc(previewTotalInput)}</strong>
+      </div>
+      <div class="split-lines"></div>
+    </div>
+
+    <div class="flow-lane">
+      <h4>Created outputs</h4>
+      {#if previewRecipients.length === 0}
+        <div class="empty-node">Add a recipient amount to see outputs.</div>
+      {:else}
+        {#each previewRecipients as recipient (recipient.id)}
+          <div class="flow-node output-node">
+            <span class="node-kicker">Recipient output</span>
+            <strong>{recipient.amount || 0} BTC</strong>
+            <span class="hash">{shortAddress(recipient.address)}</span>
+          </div>
+        {/each}
+      {/if}
+
+      {#if previewChange > 0n}
+        <div class="flow-node change-node">
+          <span class="node-kicker">Change output</span>
+          <strong>{formatBtc(previewChange)}</strong>
+          <span class="hash">{shortAddress(changeAddress)}</span>
+        </div>
+      {/if}
+
+      <div class="flow-node fee-node">
+        <span class="node-kicker">Block producer fee claim</span>
+        <strong>{formatBtc(previewFee)}</strong>
+        <span class="hash">{shortAddress(minerAddress)}</span>
+        <span class="fee-note">Coinbase reward, not a normal output</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-summary">
+    <span>Inputs: {formatBtc(previewTotalInput)}</span>
+    <span>Recipients: {formatBtc(previewRecipientTotal)}</span>
+    <span>Fee: {formatBtc(previewFee)}</span>
+    <span>Change: {formatBtc(previewChange)}</span>
+  </div>
+  {#if previewHasShortfall}
+    <p class="error">Preview shortfall: selected inputs do not cover outputs plus fee.</p>
   {/if}
 </section>
 
@@ -431,6 +557,46 @@
     cursor: pointer;
   }
 
+  .recipient-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .recipient-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.6fr) auto;
+    gap: 0.75rem;
+    align-items: flex-end;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.9rem;
+    background: var(--background);
+  }
+
+  .recipient-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .recipient-actions button {
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 0.55rem 1rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .recipient-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
   .primary {
     background: var(--primary);
     color: var(--primary-foreground);
@@ -480,6 +646,142 @@
     font-weight: 600;
   }
 
+  .flow-diagram {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1fr);
+    gap: 1rem;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 1rem;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.06), transparent 32%),
+      var(--background);
+  }
+
+  .flow-diagram.shortfall {
+    border-color: #b00020;
+  }
+
+  .flow-lane {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .flow-lane h4 {
+    margin: 0;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-text);
+  }
+
+  .flow-center {
+    min-height: 230px;
+    display: grid;
+    grid-template-rows: 1fr auto 1fr;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .join-lines,
+  .split-lines {
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(var(--border), var(--text), var(--border));
+    opacity: 0.45;
+  }
+
+  .tx-node {
+    width: 130px;
+    min-height: 130px;
+    border: 2px solid var(--text);
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+
+  .tx-node span,
+  .node-kicker {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-text);
+  }
+
+  .tx-node strong {
+    font-size: 0.9rem;
+  }
+
+  .flow-node,
+  .empty-node {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.8rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flow-node::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+  }
+
+  .input-node::before {
+    background: #2563eb;
+  }
+
+  .output-node::before {
+    background: #16a34a;
+  }
+
+  .change-node::before {
+    background: #d97706;
+  }
+
+  .fee-node::before {
+    background: #6b7280;
+  }
+
+  .empty-node {
+    color: var(--muted-text);
+    border-style: dashed;
+    background: transparent;
+  }
+
+  .flow-summary {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .flow-summary span {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    background: var(--background);
+    font-size: 0.82rem;
+    color: var(--muted-text);
+  }
+
+  .fee-note {
+    font-size: 0.72rem;
+    color: var(--muted-text);
+  }
+
   .tx {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -527,6 +829,30 @@
   }
 
   @media (max-width: 720px) {
+    .recipient-row {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .recipient-actions {
+      justify-content: flex-start;
+    }
+
+    .flow-diagram {
+      grid-template-columns: 1fr;
+    }
+
+    .flow-center {
+      min-height: auto;
+      grid-template-rows: auto;
+    }
+
+    .join-lines,
+    .split-lines {
+      width: 100%;
+      height: 2px;
+    }
+
     .tx {
       grid-template-columns: 1fr;
       text-align: center;

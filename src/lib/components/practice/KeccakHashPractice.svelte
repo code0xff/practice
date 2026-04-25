@@ -14,6 +14,8 @@
   let latestOutput = '';
   let history: HashEntry[] = [];
 
+  $: inputBytes = new TextEncoder().encode(inputValue).length;
+
   const saveHistory = (entries: HashEntry[]) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   };
@@ -79,6 +81,39 @@
   <div class="output">
     <span class="label">Latest output</span>
     <div class="hash">{latestOutput || '—'}</div>
+  </div>
+</section>
+
+<section class="hash-card">
+  <h3>Hash pipeline visualization</h3>
+  <p class="subtle">
+    Keccak turns arbitrary input bytes into a fixed 32-byte digest. Small input changes should
+    produce a completely different output.
+  </p>
+  <div class="hash-flow">
+    <div class="flow-node">
+      <span class="label">Input message</span>
+      <strong>{inputValue ? `${inputValue.length} chars` : 'empty'}</strong>
+      <p>{inputValue || 'Type text above'}</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <span class="label">UTF-8 bytes</span>
+      <strong>{inputBytes} bytes</strong>
+      <p>Variable length payload</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node sponge">
+      <span class="label">Keccak sponge</span>
+      <strong>absorb + squeeze</strong>
+      <p>One-way compression</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node digest">
+      <span class="label">Digest</span>
+      <strong>32 bytes</strong>
+      <p class="hash">{latestOutput ? `${latestOutput.slice(0, 12)}…${latestOutput.slice(-8)}` : 'Hash input to fill'}</p>
+    </div>
   </div>
 </section>
 
@@ -181,6 +216,50 @@
     gap: 0.4rem;
   }
 
+  .hash-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .flow-node {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .flow-node p {
+    margin: 0;
+    color: var(--muted-text);
+    font-size: 0.82rem;
+    word-break: break-word;
+  }
+
+  .flow-node.sponge {
+    border-color: #2563eb;
+  }
+
+  .flow-node.digest {
+    border-color: #16a34a;
+  }
+
+  .flow-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--muted-text);
+    font-size: 1.2rem;
+  }
+
   .label {
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -217,6 +296,14 @@
   @media (max-width: 720px) {
     .header {
       flex-direction: column;
+    }
+
+    .hash-flow {
+      grid-template-columns: 1fr;
+    }
+
+    .flow-arrow {
+      transform: rotate(90deg);
     }
   }
 </style>

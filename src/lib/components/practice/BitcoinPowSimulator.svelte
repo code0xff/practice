@@ -33,6 +33,7 @@
   let activeWorkers: Worker[] = [];
   let workerStats: WorkerStat[] = [];
   let latestHashPreview = '';
+  let targetPrefix = '000';
 
   let roundId = 0;
   let hasWinner = false;
@@ -297,6 +298,8 @@
   onDestroy(() => {
     stop();
   });
+
+  $: targetPrefix = '0'.repeat(difficulty);
 </script>
 
 <section class="pow-controls">
@@ -330,6 +333,51 @@
       <button class="primary" on:click={start} disabled={isRunning}>Start</button>
       <button class="secondary" on:click={stop} disabled={!isRunning}>Stop</button>
       <button class="ghost" on:click={clearBlocks}>Reset</button>
+    </div>
+  </div>
+</section>
+
+<section class="pow-visual">
+  <h3>Mining race visualization</h3>
+  <p class="subtle">
+    Each worker changes its nonce until Hash256(block header) starts with the current target prefix.
+  </p>
+  <div class="race-track">
+    <div class="target-gate">
+      <span class="stat-label">Target gate</span>
+      <strong>{targetPrefix}…</strong>
+      <span class="subtle">difficulty {difficulty}</span>
+    </div>
+    <div class="miner-lanes">
+      {#if workerStats.length === 0}
+        {#each Array.from({ length: nodeCount }) as _, index}
+          <div class="miner-lane idle">
+            <span>Node-{index + 1}</span>
+            <div class="nonce-bar"></div>
+            <span class="hash">waiting</span>
+          </div>
+        {/each}
+      {:else}
+        {#each workerStats as stat (stat.id)}
+          <div class="miner-lane">
+            <span>{stat.id}</span>
+            <div class="nonce-bar">
+              <span style={`width: ${Math.min(100, (stat.latestNonce % 100000) / 1000)}%`}></span>
+            </div>
+            <span class="hash" title={stat.latestHash}>{shortHash(stat.latestHash)}</span>
+          </div>
+        {/each}
+      {/if}
+    </div>
+    <div class="block-output">
+      <span class="stat-label">Winning block</span>
+      {#if blocks.length}
+        <strong>Height {blocks[blocks.length - 1].height}</strong>
+        <span>{blocks[blocks.length - 1].miner}</span>
+      {:else}
+        <strong>Not mined yet</strong>
+        <span>Start the race</span>
+      {/if}
     </div>
   </div>
 </section>
@@ -485,6 +533,83 @@
     color: var(--muted-text);
   }
 
+  .pow-visual {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    background: var(--surface);
+    margin-top: 1.5rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .race-track {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) 150px;
+    gap: 1rem;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .target-gate,
+  .block-output {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.9rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    text-align: center;
+  }
+
+  .target-gate {
+    border-color: #d97706;
+  }
+
+  .block-output {
+    border-color: #16a34a;
+  }
+
+  .miner-lanes {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .miner-lane {
+    display: grid;
+    grid-template-columns: 82px minmax(120px, 1fr) minmax(90px, 150px);
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+  }
+
+  .miner-lane.idle {
+    color: var(--muted-text);
+  }
+
+  .nonce-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .nonce-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #2563eb;
+  }
+
   .table {
     margin-top: 1rem;
     display: grid;
@@ -515,6 +640,15 @@
   }
 
   @media (max-width: 720px) {
+    .race-track {
+      grid-template-columns: 1fr;
+    }
+
+    .miner-lane {
+      grid-template-columns: 1fr;
+      border-radius: 14px;
+    }
+
     .table-row,
     .table-row.workers {
       grid-template-columns: 1fr;

@@ -32,6 +32,8 @@
     lockedValue: null
   }));
   let roundChangeReason = '';
+  let prevoteTally = { yes: 0, no: 0, pending: NODE_IDS.length };
+  let precommitTally = { yes: 0, no: 0, pending: NODE_IDS.length };
 
   const shortHash = (value: string) => {
     if (!value) return '—';
@@ -110,6 +112,12 @@
     const no = nodes.filter((node) => node[stage] === 'No').length;
     const pending = nodes.filter((node) => node[stage] === null).length;
     return { yes, no, pending };
+  };
+
+  const currentVote = (node: NodeState) => {
+    if (phase === 'prevote') return node.prevote;
+    if (phase === 'precommit') return node.precommit;
+    return node.precommit ?? node.prevote;
   };
 
   const advancePrevote = () => {
@@ -195,6 +203,9 @@
   onDestroy(() => {
     stopTimer();
   });
+
+  $: prevoteTally = tallyVotes('prevote');
+  $: precommitTally = tallyVotes('precommit');
 </script>
 
 <section class="pbft-card">
@@ -229,6 +240,66 @@
     <button class="primary" on:click={proposeBlock} disabled={phase !== 'propose'}>
       Propose block
     </button>
+  </div>
+</section>
+
+<section class="pbft-card">
+  <h3>Consensus flow visualization</h3>
+  <p class="subtle">
+    PBFT moves from proposal to prevote to precommit. A quorum of {QUORUM}/{NODE_IDS.length}
+    validators is required before the block can commit.
+  </p>
+  <div class="consensus-flow">
+    <div class="phase-node" class:active={phase === 'propose'}>
+      <span class="label">1. Propose</span>
+      <strong>Node {NODE_IDS[proposerIndex]}</strong>
+      <span class="hash">{shortHash(message)}</span>
+    </div>
+    <div class="phase-arrow">→</div>
+    <div class="phase-node" class:active={phase === 'prevote'}>
+      <span class="label">2. Prevote</span>
+      <strong>{prevoteTally.yes}/{QUORUM} yes</strong>
+      <div class="quorum-bar">
+        <span style={`width: ${(prevoteTally.yes / QUORUM) * 100}%`}></span>
+      </div>
+    </div>
+    <div class="phase-arrow">→</div>
+    <div class="phase-node" class:active={phase === 'precommit'}>
+      <span class="label">3. Precommit</span>
+      <strong>{precommitTally.yes}/{QUORUM} yes</strong>
+      <div class="quorum-bar">
+        <span style={`width: ${(precommitTally.yes / QUORUM) * 100}%`}></span>
+      </div>
+    </div>
+    <div class="phase-arrow">→</div>
+    <div class="phase-node" class:active={phase === 'commit'}>
+      <span class="label">4. Commit</span>
+      <strong>{committed.length} blocks</strong>
+      <span>{roundChangeReason || 'finalize block'}</span>
+    </div>
+  </div>
+  <div class="validator-ring">
+    {#each nodes as node}
+      {@const vote = currentVote(node)}
+      <div
+        class="validator-dot"
+        class:proposer={node.role === 'Proposer'}
+        class:locked={!!node.lockedValue}
+        class:yes={vote === 'Yes'}
+        class:no={vote === 'No'}
+        class:pending={vote === null}
+      >
+        <div>
+          <strong>Node {node.id}</strong>
+          <span>{node.role}</span>
+        </div>
+        <div class="vote-state">
+          <span class="vote-chip">{vote ?? 'Pending'}</span>
+          <small>Prevote: {node.prevote ?? 'Pending'}</small>
+          <small>Precommit: {node.precommit ?? 'Pending'}</small>
+        </div>
+      </div>
+    {/each}
   </div>
 </section>
 
@@ -410,6 +481,127 @@
     margin-top: 1.5rem;
   }
 
+  .consensus-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .phase-node {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .phase-node.active {
+    border-color: #2563eb;
+    box-shadow: inset 0 0 0 1px #2563eb;
+  }
+
+  .phase-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--muted-text);
+  }
+
+  .quorum-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .quorum-bar span {
+    display: block;
+    height: 100%;
+    max-width: 100%;
+    background: #16a34a;
+  }
+
+  .validator-ring {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .validator-dot {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 0.65rem 0.85rem;
+    background: var(--background);
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .validator-dot > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .validator-dot > div:first-child span,
+  .vote-state small {
+    color: var(--muted-text);
+    font-size: 0.74rem;
+  }
+
+  .validator-dot.proposer {
+    border-color: #d97706;
+  }
+
+  .validator-dot.locked {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px #16a34a;
+  }
+
+  .validator-dot.yes {
+    background: color-mix(in srgb, #16a34a 12%, var(--background));
+  }
+
+  .validator-dot.no {
+    background: color-mix(in srgb, #b00020 10%, var(--background));
+    border-color: #b00020;
+  }
+
+  .validator-dot.pending {
+    opacity: 0.82;
+  }
+
+  .vote-state {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .vote-chip {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .validator-dot.yes .vote-chip {
+    border-color: #16a34a;
+    color: #166534;
+  }
+
+  .validator-dot.no .vote-chip {
+    border-color: #b00020;
+    color: #b00020;
+  }
+
   .node-card {
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -494,6 +686,14 @@
   @media (max-width: 720px) {
     .header {
       flex-direction: column;
+    }
+
+    .consensus-flow {
+      grid-template-columns: 1fr;
+    }
+
+    .phase-arrow {
+      transform: rotate(90deg);
     }
   }
 </style>

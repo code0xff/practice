@@ -298,6 +298,35 @@
 </section>
 
 <section class="lab-card">
+  <h3>Legacy transaction pipeline</h3>
+  <p class="subtle">
+    Fields are RLP encoded, hashed, signed, then packed into the raw transaction submitted to the
+    network.
+  </p>
+  <div class="tx-flow">
+    <div class="tx-node">
+      <span>Fields</span>
+      <strong>nonce · gas · to · value · data · chainId</strong>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="tx-node" class:ready={!!unsignedRlpHex}>
+      <span>Unsigned RLP</span>
+      <strong>{unsignedRlpHex ? `${unsignedRlpHex.length / 2} bytes` : 'pending'}</strong>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="tx-node" class:ready={!!unsignedHashHex}>
+      <span>Keccak hash</span>
+      <strong>{unsignedHashHex ? `${unsignedHashHex.slice(0, 10)}…` : 'pending'}</strong>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="tx-node" class:ready={!!signature.rawTx}>
+      <span>Signed raw tx</span>
+      <strong>{signature.rawTx ? 'ready for broadcast' : 'not signed'}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="lab-card">
   <div class="header">
     <h3>Step 2: LegacyTx fields</h3>
     <button class="ghost" on:click={resetTx}>Reset fields</button>
@@ -471,5 +500,53 @@
     padding-left: 1.2rem;
     display: grid;
     gap: 0.25rem;
+  }
+
+  .tx-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .tx-node {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--surface);
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .tx-node.ready {
+    border-color: #16a34a;
+    box-shadow: inset 0 0 0 1px #16a34a;
+  }
+
+  .tx-node span {
+    color: var(--muted-text);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .flow-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--muted-text);
+  }
+
+  @media (max-width: 720px) {
+    .tx-flow {
+      grid-template-columns: 1fr;
+    }
+
+    .flow-arrow {
+      transform: rotate(90deg);
+    }
   }
 </style>

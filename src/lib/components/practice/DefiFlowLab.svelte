@@ -115,6 +115,42 @@
 </section>
 
 <section class="lab-card">
+  <h3>AMM flow visualization</h3>
+  <p class="subtle">
+    The pool keeps x * y = k. Swaps add Token A, remove Token B, and retain the fee inside the pool.
+  </p>
+  <div class="amm-visual">
+    <div class="asset-node">
+      <span>Trader input</span>
+      <strong>{swapInputA.toFixed(4)} A</strong>
+      <small>fee: {feesEarnedInA().toFixed(4)} A</small>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="pool-node">
+      <span>Constant product pool</span>
+      <strong>{tokenAReserve.toFixed(2)} A / {tokenBReserve.toFixed(2)} B</strong>
+      <small>k = {invariant().toFixed(2)}</small>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="asset-node">
+      <span>Trader output</span>
+      <strong>{outputB().toFixed(4)} B</strong>
+      <small>price impact {priceImpact().toFixed(2)}%</small>
+    </div>
+  </div>
+  <div class="reserve-bars">
+    <div>
+      <span>Token A after swap</span>
+      <strong>{(tokenAReserve + swapInputA).toFixed(4)}</strong>
+    </div>
+    <div>
+      <span>Token B after swap</span>
+      <strong>{newReserveB().toFixed(4)}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="lab-card">
   <h3>LP risk check</h3>
   <div class="stats-grid">
     <div class="stat">
@@ -202,5 +238,67 @@
 
   .warning {
     color: #b42318;
+  }
+
+  .amm-visual {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .asset-node,
+  .pool-node,
+  .reserve-bars div {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.9rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .pool-node {
+    border-color: #2563eb;
+    text-align: center;
+  }
+
+  .asset-node span,
+  .pool-node span,
+  .reserve-bars span {
+    color: var(--muted-text);
+    font-size: 0.8rem;
+  }
+
+  .asset-node small,
+  .pool-node small {
+    color: var(--muted-text);
+  }
+
+  .flow-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--muted-text);
+  }
+
+  .reserve-bars {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (max-width: 720px) {
+    .amm-visual {
+      grid-template-columns: 1fr;
+    }
+
+    .flow-arrow {
+      transform: rotate(90deg);
+    }
   }
 </style>

@@ -182,6 +182,42 @@
   <p class="subtle">{ceremonyStep}</p>
 </section>
 
+<section class="dh-card">
+  <h3>Key exchange visualization</h3>
+  <p class="subtle">
+    Alice and Bob exchange public keys over the channel. Each side combines its private key with
+    the partner public key to derive the same shared secret.
+  </p>
+  <div class="dh-visual">
+    <div class="party-node">
+      <span>Alice private</span>
+      <strong>{shortValue(alice.privateKey)}</strong>
+      <small>never shared</small>
+    </div>
+    <div class="public-channel">
+      <span>Alice public →</span>
+      <strong>{shortValue(alice.publicKey)}</strong>
+      <span>← Bob public</span>
+      <strong>{shortValue(bob.publicKey)}</strong>
+    </div>
+    <div class="party-node">
+      <span>Bob private</span>
+      <strong>{shortValue(bob.privateKey)}</strong>
+      <small>never shared</small>
+    </div>
+  </div>
+  <div class="secret-row">
+    <div class:ready={!!alice.sharedSecret}>
+      <span>Alice shared secret</span>
+      <strong>{shortValue(alice.sharedSecret)}</strong>
+    </div>
+    <div class:ready={!!bob.sharedSecret}>
+      <span>Bob shared secret</span>
+      <strong>{shortValue(bob.sharedSecret)}</strong>
+    </div>
+  </div>
+</section>
+
 <section class="dh-grid">
   <div class="dh-card">
     <div class="header">
@@ -361,5 +397,59 @@
   .error {
     color: #b00020;
     font-weight: 600;
+  }
+
+  .dh-visual {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .party-node,
+  .public-channel,
+  .secret-row div {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .public-channel {
+    border-color: #2563eb;
+    text-align: center;
+  }
+
+  .party-node span,
+  .party-node small,
+  .public-channel span,
+  .secret-row span {
+    color: var(--muted-text);
+    font-size: 0.8rem;
+  }
+
+  .secret-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .secret-row div.ready {
+    border-color: #16a34a;
+    box-shadow: inset 0 0 0 1px #16a34a;
+  }
+
+  @media (max-width: 720px) {
+    .dh-visual {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

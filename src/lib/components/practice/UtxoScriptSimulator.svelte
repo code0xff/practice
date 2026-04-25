@@ -504,6 +504,26 @@
     </div>
   </div>
 
+  <div class="panel script-flow">
+    <h4>Script validation visualization</h4>
+    <div class="script-visual">
+      <div class="script-node">
+        <span>scriptSig</span>
+        <strong>{signature ? 'signature + public key' : 'waiting for spend'}</strong>
+      </div>
+      <div class="script-arrow">+</div>
+      <div class="script-node lock">
+        <span>scriptPubKey</span>
+        <strong>DUP HASH160 EQUALVERIFY CHECKSIG</strong>
+      </div>
+      <div class="script-arrow">→</div>
+      <div class="script-node" class:success={scriptStatus === 'complete'} class:fail={scriptStatus === 'error'}>
+        <span>Stack result</span>
+        <strong>{scriptStatus === 'complete' ? 'valid spend' : scriptStatus === 'error' ? 'rejected' : 'not finalized'}</strong>
+      </div>
+    </div>
+  </div>
+
   <div class="panel steps">
     <div class="step-list">
       <h4>Script steps</h4>
@@ -790,11 +810,61 @@
     color: var(--muted-text);
   }
 
+  .script-visual {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.2fr) auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .script-node {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--background);
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .script-node.lock {
+    border-color: #2563eb;
+  }
+
+  .script-node.success {
+    border-color: #16a34a;
+    box-shadow: inset 0 0 0 1px #16a34a;
+  }
+
+  .script-node.fail {
+    border-color: #b00020;
+  }
+
+  .script-node span {
+    color: var(--muted-text);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .script-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--muted-text);
+  }
+
   @media (max-width: 720px) {
     .panel,
     .panel.steps,
     .panel.status {
       grid-template-columns: 1fr;
+    }
+
+    .script-visual {
+      grid-template-columns: 1fr;
+    }
+
+    .script-arrow {
+      transform: rotate(90deg);
     }
   }
 </style>

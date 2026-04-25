@@ -27,6 +27,11 @@
     return `${value.slice(0, 6)}…${value.slice(-4)}`;
   };
 
+  const selectedPathIndex = (level: number) => Math.floor(selectedLeafIndex / 2 ** level);
+
+  const isProofSibling = (level: number, index: number) =>
+    level < treeLevels.length - 1 && index === (selectedPathIndex(level) ^ 1);
+
   const toHex = (buffer: ArrayBuffer) =>
     Array.from(new Uint8Array(buffer))
       .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -236,6 +241,42 @@
 </section>
 
 <section class="merkle-card">
+  <h3>Tree visualization</h3>
+  <p class="subtle">
+    Leaves sit at the bottom, parent hashes roll upward, and the selected proof path is highlighted.
+  </p>
+  {#if treeLevels.length === 0}
+    <p class="subtle">Enter leaves to build the tree.</p>
+  {:else}
+    <div class="tree-visual">
+      {#each treeLevels.slice().reverse() as level, reverseIndex}
+        {@const originalLevel = treeLevels.length - 1 - reverseIndex}
+        <div class="tree-row">
+          <span class="level-label">
+            {originalLevel === 0 ? 'Leaves' : originalLevel === treeLevels.length - 1 ? 'Root' : `Level ${originalLevel}`}
+          </span>
+          <div class="tree-nodes">
+            {#each level as hash, index}
+              <div
+                class="tree-node"
+                class:selected={index === selectedPathIndex(originalLevel)}
+                class:proof={isProofSibling(originalLevel, index)}
+                title={hash}
+              >
+                <span>{shortHash(hash)}</span>
+                {#if originalLevel === 0}
+                  <small>{leaves[index] || `Leaf ${index + 1}`}</small>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+</section>
+
+<section class="merkle-card">
   <h3>Merkle proof</h3>
   <p class="subtle">
     Proof steps show the sibling hashes needed to verify the selected leaf.
@@ -393,6 +434,67 @@
     border-radius: 12px;
     padding: 0.5rem 0.75rem;
     background: var(--background);
+  }
+
+  .tree-visual {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+    overflow-x: auto;
+  }
+
+  .tree-row {
+    display: grid;
+    grid-template-columns: 82px 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    min-width: 620px;
+  }
+
+  .level-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-text);
+  }
+
+  .tree-nodes {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+
+  .tree-node {
+    min-width: 84px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.5rem 0.65rem;
+    background: var(--surface);
+    text-align: center;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .tree-node.selected {
+    border-color: #2563eb;
+    box-shadow: inset 0 0 0 1px #2563eb;
+  }
+
+  .tree-node.proof {
+    border-color: #d97706;
+    box-shadow: inset 0 0 0 1px #d97706;
+  }
+
+  .tree-node small {
+    color: var(--muted-text);
+    font-size: 0.7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chip {

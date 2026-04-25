@@ -546,6 +546,47 @@
   {/if}
 </section>
 
+<section class="lab-card">
+  <h3>Derivation path visualization</h3>
+  <p class="subtle">
+    The same private key becomes different account formats because each chain hashes and encodes
+    the public key differently.
+  </p>
+  <div class="derive-flow">
+    <div class="derive-node">
+      <span>Private key</span>
+      <strong>{privateKey ? `${privateKey.slice(0, 10)}…` : 'not set'}</strong>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="derive-node">
+      <span>Public key</span>
+      <strong>
+        {chain === 'ethereum'
+          ? ethPublicUncompressed ? 'uncompressed secp256k1' : 'pending'
+          : chain === 'bitcoin'
+            ? btcPublicCompressed ? 'compressed secp256k1' : 'pending'
+            : cosmosPublicCompressed ? 'compressed secp256k1' : 'pending'}
+      </strong>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="derive-node hash-node">
+      <span>Hash step</span>
+      <strong>{chain === 'ethereum' ? 'Keccak256' : 'HASH160'}</strong>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="derive-node address-node">
+      <span>{chain} address</span>
+      <strong>
+        {chain === 'ethereum'
+          ? ethChecksumAddress || ethAddress || 'pending'
+          : chain === 'bitcoin'
+            ? btcP2wpkh || btcP2pkh || 'pending'
+            : cosmosAddress || 'pending'}
+      </strong>
+    </div>
+  </div>
+</section>
+
 {#if chain === 'ethereum'}
   <section class="lab-card">
     <h3>Step 1: Derive uncompressed public key</h3>
@@ -810,6 +851,52 @@
     word-break: break-all;
   }
 
+  .derive-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.2fr);
+    gap: 0.75rem;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+  }
+
+  .derive-node {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--surface);
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .derive-node span {
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .derive-node strong {
+    word-break: break-all;
+  }
+
+  .hash-node {
+    border-color: #2563eb;
+  }
+
+  .address-node {
+    border-color: #16a34a;
+  }
+
+  .flow-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+  }
+
   @media (max-width: 760px) {
     .header {
       flex-direction: column;
@@ -821,6 +908,14 @@
 
     .chain-label {
       align-self: stretch;
+    }
+
+    .derive-flow {
+      grid-template-columns: 1fr;
+    }
+
+    .flow-arrow {
+      transform: rotate(90deg);
     }
   }
 </style>

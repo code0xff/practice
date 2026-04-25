@@ -185,6 +185,40 @@
 </section>
 
 <section class="lab-card">
+  <h3>Deployment pipeline visualization</h3>
+  <p class="subtle">
+    A deployment transaction packages constructor arguments and bytecode, pays gas, then produces
+    a contract address after inclusion on chain.
+  </p>
+  <div class="deploy-flow">
+    {#each stages as stage, index}
+      <div class="deploy-stage" class:complete={stage.checks.every((check) => check.done)}>
+        <span>{index + 1}</span>
+        <strong>{stage.title}</strong>
+        <small>{stage.checks.filter((check) => check.done).length}/{stage.checks.length} checks</small>
+      </div>
+      {#if index < stages.length - 1}
+        <div class="flow-arrow">→</div>
+      {/if}
+    {/each}
+  </div>
+  <div class="gas-visual">
+    <div>
+      <span>Estimated gas</span>
+      <strong>{estimatedDeployGas().toLocaleString()}</strong>
+    </div>
+    <div class:bad={gasHeadroom() < 0}>
+      <span>Limit headroom</span>
+      <strong>{gasHeadroom().toLocaleString()}</strong>
+    </div>
+    <div>
+      <span>Broadcast cost</span>
+      <strong>{deploymentCostEth().toFixed(6)} ETH</strong>
+    </div>
+  </div>
+</section>
+
+<section class="lab-card">
   <h3>Pre-deployment checklist</h3>
   <p class="subtle">
     Check each item only after you can explain why it matters. The goal is to rehearse the
@@ -325,5 +359,78 @@
   .warning,
   .bad {
     color: #b42318;
+  }
+
+  .deploy-flow {
+    display: grid;
+    grid-template-columns: repeat(7, auto);
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    background: var(--background);
+    overflow-x: auto;
+  }
+
+  .deploy-stage {
+    min-width: 130px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: var(--surface);
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .deploy-stage.complete {
+    border-color: #16a34a;
+    box-shadow: inset 0 0 0 1px #16a34a;
+  }
+
+  .deploy-stage span {
+    width: 1.6rem;
+    height: 1.6rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--background);
+    color: var(--muted-text);
+    font-size: 0.78rem;
+  }
+
+  .deploy-stage small,
+  .gas-visual span {
+    color: var(--muted-text);
+  }
+
+  .flow-arrow {
+    color: var(--muted-text);
+  }
+
+  .gas-visual {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .gas-visual div {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem;
+    background: var(--background);
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  @media (max-width: 720px) {
+    .deploy-flow {
+      grid-template-columns: 1fr;
+    }
+
+    .flow-arrow {
+      transform: rotate(90deg);
+      justify-self: center;
+    }
   }
 </style>
